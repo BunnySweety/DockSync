@@ -199,5 +199,56 @@ try {
 } catch (error) {
   assert(error.code === 'ENOENT', error.message);
 }
+
+const failingDownloadEngine = new SyncEngine({
+  localPath: guardedRoot,
+  stateDir: guardedState,
+  stateFile: path.join(guardedState, 'sync-state.json'),
+  conflictStrategy: 'newer-wins',
+  bandwidthLimitBps: 0,
+}, logger, {
+  async readFile(_relativePath, destination) {
+    await fs.writeFile(destination, 'partial\n');
+    throw new Error('download failed');
+  },
+});
+
+try {
+  await failingDownloadEngine.downloadToLocal('partial.txt', { mtimeMs: Date.now() });
+  throw new Error('download failure was not propagated');
+} catch (error) {
+  assert(error.message === 'download failed', error.message);
+}
+try {
+  await fs.access(path.join(guardedRoot, `partial.txt.docksync.tmp-${process.pid}`));
+  throw new Error('failed download temp file was left behind');
+} catch (error) {
+  assert(error.code === 'ENOENT', error.message);
+}
+
+const failingConflictEngine = new SyncEngine({
+  localPath: guardedRoot,
+  stateDir: guardedState,
+  stateFile: path.join(guardedState, 'sync-state.json'),
+  conflictStrategy: 'newer-wins',
+  bandwidthLimitBps: 0,
+}, logger, {
+  async readFile(_relativePath, destination) {
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, 'remote conflict\n');
+  },
+  async writeFile() {
+    throw new Error('preserve failed');
+  },
+});
+
+try {
+  await failingConflictEngine.preserveRemoteConflict('remote.txt', { mtimeMs: Date.now() });
+  throw new Error('remote conflict failure was not propagated');
+} catch (error) {
+  assert(error.message === 'preserve failed', error.message);
+}
+const conflictTempFiles = await fs.readdir(path.join(guardedState, 'tmp'));
+assert(conflictTempFiles.length === 0, 'failed remote conflict temp file was left behind');
 NODE
 echo "sandbox sync test passed"

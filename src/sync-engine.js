@@ -138,11 +138,15 @@ export class SyncEngine {
     const destination = resolveInsideRoot(this.config.localPath, relativePath);
     await ensureParentDirectory(destination);
     const tempPath = `${destination}.docksync.tmp-${process.pid}`;
-    await this.remote.readFile(relativePath, tempPath);
-    await fs.promises.rename(tempPath, destination);
-    if (remoteMetadata?.mtimeMs) {
-      const mtime = new Date(remoteMetadata.mtimeMs);
-      await fs.promises.utimes(destination, mtime, mtime);
+    try {
+      await this.remote.readFile(relativePath, tempPath);
+      await fs.promises.rename(tempPath, destination);
+      if (remoteMetadata?.mtimeMs) {
+        const mtime = new Date(remoteMetadata.mtimeMs);
+        await fs.promises.utimes(destination, mtime, mtime);
+      }
+    } finally {
+      await fs.promises.rm(tempPath, { force: true });
     }
   }
 
@@ -155,9 +159,12 @@ export class SyncEngine {
   async preserveRemoteConflict(relativePath, remoteMetadata) {
     const tempPath = path.join(this.config.stateDir, 'tmp', `${Buffer.from(relativePath).toString('hex')}-${process.pid}`);
     const remoteConflictPath = conflictPath(relativePath, 'remote');
-    await this.remote.readFile(relativePath, tempPath);
-    await this.remote.writeFile(remoteConflictPath, tempPath, remoteMetadata);
-    await fs.promises.rm(tempPath, { force: true });
+    try {
+      await this.remote.readFile(relativePath, tempPath);
+      await this.remote.writeFile(remoteConflictPath, tempPath, remoteMetadata);
+    } finally {
+      await fs.promises.rm(tempPath, { force: true });
+    }
   }
 
   async saveState(localFiles, remoteFiles) {
