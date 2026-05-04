@@ -25,6 +25,55 @@ function sendJson(response, statusCode, body) {
   response.end(JSON.stringify(body));
 }
 
+async function readJsonBody(request, maxBytes = 65536) {
+  let body = '';
+  for await (const chunk of request) {
+    body += chunk.toString();
+    if (Buffer.byteLength(body) > maxBytes) {
+      throw new Error('request body is too large');
+    }
+  }
+  return JSON.parse(body || '{}');
+}
+
+function remoteName(remote) {
+  if (!remote || remote.startsWith(':local:')) {
+    return null;
+  }
+  const [name] = remote.split(':');
+  return name || null;
+}
+
+function configHasSection(content, sectionName) {
+  const sectionPattern = /^\s*\[([^\]]+)\]\s*$/gm;
+  let match;
+  while ((match = sectionPattern.exec(content)) !== null) {
+    if (match[1] === sectionName) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function validateRcloneConfig(content, expectedRemoteName) {
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('rclone.conf content is required');
+  }
+  if (content.includes('\0')) {
+    throw new Error('rclone.conf contains invalid null bytes');
+  }
+  if (/^\s*RCLONE_ENCRYPT_V\d+:/m.test(content)) {
+    throw new Error('encrypted rclone.conf files must be mounted with RCLONE_CONFIG_PASS_FILE');
+  }
+  if (expectedRemoteName && !configHasSection(content, expectedRemoteName)) {
+    throw new Error(`rclone.conf must contain a [${expectedRemoteName}] remote section`);
+  }
+}
+
+function isSetupRequest(request) {
+  return request.headers['x-docksync-setup'] === '1';
+}
+
 function summarizeSyncResult(result) {
   return {
     ok: result.ok,
@@ -81,9 +130,12 @@ async function summarizeOnboarding(config, status) {
     inspectPath(config.stateDir),
     inspectPath(config.rclone.configPath),
   ]);
+  const rcloneConfigDirectory = await inspectPath(path.dirname(config.rclone.configPath));
   const localRemote = config.rclone.remote.startsWith(':local:');
   const runtimeReady = localPath.exists && localPath.writable && stateDir.exists && stateDir.writable;
   const rcloneReady = localRemote || (rcloneConfig.exists && rcloneConfig.readable);
+  const rcloneConfigWritable = !localRemote && config.setup.enabled &&
+    (rcloneConfig.writable || (rcloneConfigDirectory.exists && rcloneConfigDirectory.writable));
 
   const checks = [
     {
@@ -100,7 +152,9 @@ async function summarizeOnboarding(config, status) {
       status: rcloneReady ? 'ready' : 'action',
       detail: rcloneReady
         ? `Rclone can use ${localRemote ? config.rclone.remote : config.rclone.configPath}.`
-        : `Create a Proton Drive remote and mount rclone.conf at ${config.rclone.configPath}.`,
+        : rcloneConfigWritable
+          ? `Paste a Proton Rclone config into the assistant to create ${config.rclone.configPath}.`
+          : `Create a Proton Drive remote and mount rclone.conf at ${config.rclone.configPath}.`,
     },
     {
       id: 'backend-init',
@@ -143,6 +197,13 @@ async function summarizeOnboarding(config, status) {
       localPath,
       stateDir,
       rcloneConfig,
+      rcloneConfigDirectory,
+    },
+    setup: {
+      enabled: config.setup.enabled,
+      allowOverwrite: config.setup.allowOverwrite,
+      expectedRemote: remoteName(config.rclone.remote),
+      rcloneConfigWritable,
     },
     checks,
     commands: [
@@ -254,6 +315,48 @@ export function startServer(config, logger, engine, status) {
 
     if (request.method === 'GET' && request.url === '/onboarding') {
       sendJson(response, 200, await summarizeOnboarding(config, status));
+      return;
+    }
+
+    if (request.method === 'POST' && request.url === '/setup/rclone-config') {
+      if (!config.setup.enabled) {
+        sendJson(response, 403, { ok: false, error: 'setup API is disabled' });
+        return;
+      }
+      if (!isSetupRequest(request)) {
+        sendJson(response, 403, { ok: false, error: 'setup request header is required' });
+        return;
+      }
+      if (status.backendReady && !config.setup.allowOverwrite) {
+        sendJson(response, 409, { ok: false, error: 'backend is already configured; enable SETUP_ALLOW_OVERWRITE to replace rclone.conf' });
+        return;
+      }
+
+      try {
+        const body = await readJsonBody(request);
+        const expectedRemote = remoteName(config.rclone.remote);
+        validateRcloneConfig(body.content, expectedRemote);
+
+        const targetPath = path.resolve(config.rclone.configPath);
+        const targetDirectory = path.dirname(targetPath);
+        await fs.promises.mkdir(targetDirectory, { recursive: true });
+        const tempPath = path.join(targetDirectory, `.rclone.conf.tmp-${process.pid}-${Date.now()}`);
+        try {
+          await fs.promises.writeFile(tempPath, body.content.trimEnd() + '\n', { mode: 0o600 });
+          await fs.promises.rename(tempPath, targetPath);
+          await fs.promises.chmod(targetPath, 0o600).catch(() => {});
+        } finally {
+          await fs.promises.rm(tempPath, { force: true }).catch(() => {});
+        }
+        status.backendReady = false;
+        status.backendError = null;
+        sendJson(response, 200, {
+          ok: true,
+          onboarding: await summarizeOnboarding(config, status),
+        });
+      } catch (error) {
+        sendJson(response, 400, { ok: false, error: error.message });
+      }
       return;
     }
 

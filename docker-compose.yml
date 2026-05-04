@@ -17,11 +17,11 @@ services:
     volumes:
       - ./data:/data
       - ./state:/state
-      - ./rclone:/config/rclone:ro
+      - ./rclone:/config/rclone
     tmpfs:
       - /tmp:noexec,nosuid,nodev,size=64m
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     security_opt:
       - no-new-privileges:true
     cap_drop:

@@ -6,6 +6,7 @@ const elements = {
   assistantCopyButton: document.querySelector('#assistantCopyButton'),
   assistantDetail: document.querySelector('#assistantDetail'),
   assistantRefreshButton: document.querySelector('#assistantRefreshButton'),
+  assistantRcloneForm: document.querySelector('#assistantRcloneForm'),
   assistantState: document.querySelector('#assistantState'),
   assistantStep: document.querySelector('#assistantStep'),
   assistantSyncButton: document.querySelector('#assistantSyncButton'),
@@ -25,6 +26,8 @@ const elements = {
   onboardingProgress: document.querySelector('#onboardingProgress'),
   onboardingSummary: document.querySelector('#onboardingSummary'),
   refreshButton: document.querySelector('#refreshButton'),
+  rcloneConfigFile: document.querySelector('#rcloneConfigFile'),
+  rcloneConfigInput: document.querySelector('#rcloneConfigInput'),
   rcloneRemote: document.querySelector('#rcloneRemoteValue'),
   remotePath: document.querySelector('#remotePathValue'),
   serial: document.querySelector('#serialValue'),
@@ -47,6 +50,7 @@ const ONBOARDING_STEPS = [
     title: 'Connect Proton Drive',
     detail: 'Authenticate with Rclone on the host, then mount the generated config.',
     checkIds: ['rclone-config'],
+    action: 'rclone-config',
     commandId: 'proton-rclone',
   },
   {
@@ -98,9 +102,14 @@ function focusOnboardingIfNeeded(onboarding) {
 }
 
 async function requestJson(url, options) {
+  const requestOptions = options || {};
+  const headers = {
+    accept: 'application/json',
+    ...(requestOptions.headers || {}),
+  };
   const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    ...options,
+    ...requestOptions,
+    headers,
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -325,11 +334,21 @@ function renderOnboarding() {
 
 function renderAssistant(onboarding) {
   const step = ONBOARDING_STEPS.find((item) => item.id === state.assistantStepId) || nextAssistantStep(onboarding);
+  if (onboarding && stepStatus(step, onboarding) === 'ready') {
+    const nextStep = nextAssistantStep(onboarding);
+    if (nextStep.id !== step.id) {
+      state.assistantStepId = nextStep.id;
+      renderAssistant(onboarding);
+      return;
+    }
+  }
   state.assistantStepId = step.id;
   const status = stepStatus(step, onboarding);
   const stepIndex = ONBOARDING_STEPS.findIndex((item) => item.id === step.id) + 1;
   const command = step.commandId ? commandById(onboarding, step.commandId)?.command : null;
-  const commandNeeded = Boolean(command && status !== 'ready');
+  const canWriteRcloneConfig = Boolean(onboarding.setup?.rcloneConfigWritable);
+  const showRcloneForm = step.action === 'rclone-config' && status !== 'ready' && canWriteRcloneConfig;
+  const commandNeeded = Boolean(command && status !== 'ready' && !showRcloneForm);
   const syncAllowed = step.action === 'sync' && status !== 'ready' && state.status?.config?.manualSyncEnabled !== false;
 
   elements.assistantStep.textContent = `Step ${stepIndex} of ${ONBOARDING_STEPS.length}`;
@@ -343,6 +362,7 @@ function renderAssistant(onboarding) {
     ? `<pre><code>${escapeHtml(command)}</code></pre>`
     : '';
   elements.assistantCommand.hidden = !commandNeeded;
+  elements.assistantRcloneForm.hidden = !showRcloneForm;
   elements.assistantCopyButton.hidden = !commandNeeded;
   elements.assistantCopyButton.dataset.commandId = commandNeeded ? step.commandId : '';
   elements.assistantSyncButton.hidden = !syncAllowed;
@@ -422,6 +442,48 @@ async function triggerSync() {
   }
 }
 
+async function saveRcloneConfig(event) {
+  event.preventDefault();
+  const content = elements.rcloneConfigInput.value.trim();
+  if (!content) {
+    showToast('Rclone config is required');
+    return;
+  }
+  const submitButton = elements.assistantRcloneForm.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+  try {
+    const result = await requestJson('/setup/rclone-config', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-docksync-setup': '1',
+      },
+      body: JSON.stringify({ content }),
+    });
+    elements.rcloneConfigInput.value = '';
+    state.onboarding = result.onboarding || state.onboarding;
+    state.assistantStepId = null;
+    render();
+    showToast('Rclone config saved');
+    await refreshStatus({ silent: true });
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    submitButton.disabled = false;
+  }
+}
+
+async function loadRcloneConfigFile() {
+  const [file] = elements.rcloneConfigFile.files || [];
+  if (!file) return;
+  if (file.size > 65536) {
+    showToast('rclone.conf is too large');
+    elements.rcloneConfigFile.value = '';
+    return;
+  }
+  elements.rcloneConfigInput.value = await file.text();
+}
+
 document.querySelectorAll('[data-filter]').forEach((button) => {
   button.addEventListener('click', () => {
     state.filter = button.dataset.filter;
@@ -435,6 +497,8 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
 elements.refreshButton.addEventListener('click', () => refreshStatus());
 elements.syncButton.addEventListener('click', triggerSync);
 elements.assistantRefreshButton.addEventListener('click', () => refreshStatus());
+elements.assistantRcloneForm.addEventListener('submit', saveRcloneConfig);
+elements.rcloneConfigFile.addEventListener('change', loadRcloneConfigFile);
 elements.assistantSyncButton.addEventListener('click', triggerSync);
 elements.assistantCopyButton.addEventListener('click', async () => {
   const command = commandById(state.onboarding, elements.assistantCopyButton.dataset.commandId)?.command;

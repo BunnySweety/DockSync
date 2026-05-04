@@ -77,6 +77,8 @@ Run with Compose:
 docker compose up --build -d
 ```
 
+Compose binds the web console to `127.0.0.1:8080` and mounts `rclone/` writable so the installation assistant can create `rclone/rclone.conf`.
+
 To mount secret files through Compose, include the secrets override:
 
 ```bash
@@ -96,7 +98,7 @@ docker run -d --name docksync \
   --env-file config/docksync.env.example \
   --mount "type=bind,source=$PWD/data,target=/data" \
   --mount "type=bind,source=$PWD/state,target=/state" \
-  --mount "type=bind,source=$PWD/rclone,target=/config/rclone,readonly" \
+  --mount "type=bind,source=$PWD/rclone,target=/config/rclone" \
   docksync:local
 ```
 

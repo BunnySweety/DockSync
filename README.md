@@ -49,9 +49,10 @@ docker run --rm --read-only --user 10001:10001 \
   -e SYNC_BACKEND=rclone \
   -e RCLONE_REMOTE=proton: \
   -e SYNC_REMOTE_PATH=/DockSync \
+  -e SETUP_API_ENABLED=true \
   --mount "type=bind,source=$PWD/data,target=/data" \
   --mount "type=bind,source=$PWD/state,target=/state" \
-  --mount "type=bind,source=$PWD/rclone,target=/config/rclone,readonly" \
+  --mount "type=bind,source=$PWD/rclone,target=/config/rclone" \
   docksync:local
 ```
 
@@ -90,7 +91,7 @@ mkdir -p data state rclone
 docker run --rm --read-only --user 10001:10001 \
   --mount "type=bind,source=$PWD/data,target=/data" \
   --mount "type=bind,source=$PWD/state,target=/state" \
-  --mount "type=bind,source=$PWD/rclone,target=/config/rclone,readonly" \
+  --mount "type=bind,source=$PWD/rclone,target=/config/rclone" \
   --env-file config/docksync.env.example \
   docksync:local
 ```
@@ -107,7 +108,7 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
 ```
 
-Open `http://localhost:8080/` to follow the first-connection installation assistant, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. If `rclone/rclone.conf` is not mounted yet, the console stays available and marks Rclone setup as required.
+Open `http://localhost:8080/` to follow the first-connection installation assistant, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. The assistant can write `rclone/rclone.conf` when `/config/rclone` is writable. Compose publishes the console on `127.0.0.1` by default so setup stays local.
 
 ## Configuration
 
@@ -145,4 +146,4 @@ Use `DEPLOYMENT.md` for a step-by-step deployment checklist. The frontend also e
 
 ## Security Notes
 
-Run with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, and writable mounts only for `/data` and `/state`. Keep credentials outside the image, rotate session material regularly, and isolate the container network to the minimum egress required for Proton Drive.
+Run with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, and writable mounts only for `/data`, `/state`, and `/config/rclone` during first-run setup. Keep the host port bound to `127.0.0.1` while `SETUP_API_ENABLED=true`, keep credentials outside the image, rotate session material regularly, and isolate the container network to the minimum egress required for Proton Drive.

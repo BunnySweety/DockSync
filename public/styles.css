@@ -414,6 +414,51 @@ h3 {
   background: var(--bg);
 }
 
+.assistant-form {
+  display: grid;
+  gap: var(--spacing-12);
+  margin-top: var(--spacing-16);
+}
+
+.assistant-form[hidden] {
+  display: none;
+}
+
+.assistant-form label {
+  color: var(--text);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.assistant-form textarea {
+  width: 100%;
+  min-height: 190px;
+  resize: vertical;
+  padding: var(--spacing-12);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body);
+}
+
+.assistant-form input[type="file"] {
+  width: 100%;
+  padding: var(--spacing-12);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--color-iron-gray);
+  font-size: var(--text-body-sm);
+}
+
+.assistant-form textarea:focus {
+  box-shadow: var(--shadow-subtle);
+  outline: none;
+}
+
 .assistant-command pre {
   margin: 0;
   overflow-x: auto;

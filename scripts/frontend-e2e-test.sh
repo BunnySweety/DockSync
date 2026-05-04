@@ -215,12 +215,15 @@ async function waitFor(predicate, label) {
   assert(indexHtml.includes('id="onboardingChecks"'), 'frontend exposes onboarding checklist');
   assert(indexHtml.includes('id="setupAssistant"'), 'frontend exposes setup assistant');
   assert(indexHtml.includes('id="assistantSyncButton"'), 'frontend exposes assistant sync action');
+  assert(indexHtml.includes('id="rcloneConfigInput"'), 'frontend exposes rclone config input');
+  assert(indexHtml.includes('id="rcloneConfigFile"'), 'frontend exposes rclone config file import');
 
   const styles = await getText('/styles.css');
   assert(styles.includes('var(--font-protonserif)'), 'frontend styles consume heading font token');
   assert(styles.includes('var(--radius-cards)'), 'frontend styles consume card radius token');
   assert(styles.includes('.onboarding-panel'), 'frontend styles onboarding panel');
   assert(styles.includes('.setup-assistant'), 'frontend styles setup assistant');
+  assert(styles.includes('.assistant-form'), 'frontend styles assistant form');
 
   const variables = await getText('/variables.css');
   assert(variables.includes('--color-action-violet'), 'variables.css is served');
@@ -365,6 +368,19 @@ async function waitFor(predicate, label) {
   assert(onboarding.ok === false, 'onboarding reports incomplete setup');
   assert(onboarding.checks?.some((check) => check.id === 'rclone-config' && check.status === 'action'), 'onboarding flags missing rclone config');
   assert(onboarding.checks?.some((check) => check.id === 'backend-init' && check.status === 'action'), 'onboarding flags backend init error');
+
+  const saveResponse = await fetch(`${baseUrl}/setup/rclone-config`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-docksync-setup': '1',
+    },
+    body: JSON.stringify({ content: '[proton]\ntype = protondrive\n' }),
+  });
+  assert(saveResponse.ok, `setup save returned ${saveResponse.status}`);
+  const saved = await saveResponse.json();
+  assert(saved.ok === true, 'setup save succeeds');
+  assert(saved.onboarding?.checks?.some((check) => check.id === 'rclone-config' && check.status === 'ready'), 'onboarding reports saved rclone config');
 })().catch((error) => {
   console.error(error);
   process.exit(1);

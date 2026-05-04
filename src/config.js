@@ -74,6 +74,10 @@ export function loadConfig(env = process.env) {
       port: parseNumber(env.API_PORT, 8080, { min: 1 }),
       manualSyncEnabled: parseBool(env.ENABLE_REST_API, true),
     },
+    setup: {
+      enabled: parseBool(env.SETUP_API_ENABLED, true),
+      allowOverwrite: parseBool(env.SETUP_ALLOW_OVERWRITE, false),
+    },
     retry: {
       maxAttempts: parseNumber(env.RETRY_MAX_ATTEMPTS, 5, { min: 1 }),
       initialDelayMs: parseNumber(env.RETRY_INITIAL_DELAY_MS, 1000, { min: 1 }),
