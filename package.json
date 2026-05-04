@@ -8,6 +8,7 @@
   "files": [
     "config/docksync.env.example",
     "DEPLOYMENT.md",
+    "docker-compose.secrets.yml",
     "docker-compose.yml",
     "Dockerfile",
     "README.md",

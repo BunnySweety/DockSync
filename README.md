@@ -101,6 +101,12 @@ Or use Compose:
 docker compose up --build
 ```
 
+`npm run onboard` creates empty ignored secret placeholders. To mount encrypted Rclone config or webhook URL secrets through Compose, fill the needed files under `secrets/` and include the override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
+```
+
 Open `http://localhost:8080/` to view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`.
 
 ## Configuration
@@ -135,7 +141,7 @@ This builds the Docker image, runs it with a read-only root filesystem, rootless
 
 ## Deployment
 
-Use `DEPLOYMENT.md` for a step-by-step deployment checklist. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with `docker compose up --build -d`.
+Use `DEPLOYMENT.md` for a step-by-step deployment checklist. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with Compose.
 
 ## Security Notes
 

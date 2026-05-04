@@ -17,7 +17,7 @@ npm ci
 npm run onboard
 ```
 
-`npm run onboard` creates ignored `data/`, `state/`, `rclone/`, and `secrets/` directories, then verifies local prerequisites and package hygiene.
+`npm run onboard` creates ignored `data/`, `state/`, `rclone/`, and `secrets/` paths, including empty secret placeholders for the optional Compose override. It then verifies local prerequisites and package hygiene.
 
 ## 2. Configure Proton Drive
 
@@ -42,7 +42,14 @@ printf '%s\n' 'your-rclone-config-passphrase' > secrets/rclone_config_pass
 chmod 600 secrets/rclone_config_pass
 ```
 
-Set `RCLONE_CONFIG_PASS_FILE=/run/secrets/rclone_config_pass` when using Docker secrets.
+For webhook notifications, store the webhook URL the same way:
+
+```bash
+printf '%s\n' 'https://example.invalid/webhook' > secrets/docksync_error_webhook
+chmod 600 secrets/docksync_error_webhook
+```
+
+`npm run onboard` creates empty placeholders for these files. Leave unused placeholders empty; Docker mounts them through the optional Compose secrets override.
 
 ## 3. Validate Locally
 
@@ -70,6 +77,12 @@ Run with Compose:
 docker compose up --build -d
 ```
 
+To mount secret files through Compose, include the secrets override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
+```
+
 Or run directly:
 
 ```bash
@@ -85,6 +98,13 @@ docker run -d --name docksync \
   --mount "type=bind,source=$PWD/state,target=/state" \
   --mount "type=bind,source=$PWD/rclone,target=/config/rclone,readonly" \
   docksync:local
+```
+
+For direct `docker run` with an encrypted Rclone config, add:
+
+```bash
+--env RCLONE_CONFIG_PASS_FILE=/run/secrets/rclone_config_pass \
+--mount "type=bind,source=$PWD/secrets/rclone_config_pass,target=/run/secrets/rclone_config_pass,readonly"
 ```
 
 Open `http://127.0.0.1:8080/` for the web console.

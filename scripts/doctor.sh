@@ -13,7 +13,8 @@ for arg in "$@"; do
 Usage: npm run doctor [-- --init]
 
 Checks local prerequisites and deployment inputs. With --init, creates ignored
-runtime directories used by Docker and local development.
+runtime directories and empty secret placeholders used by Docker and local
+development.
 HELP
       exit 0
       ;;
@@ -53,8 +54,10 @@ find_docker() {
 
 if [ "$INIT" = true ]; then
   mkdir -p "$ROOT/data" "$ROOT/state" "$ROOT/rclone" "$ROOT/secrets"
+  touch "$ROOT/secrets/rclone_config_pass" "$ROOT/secrets/docksync_error_webhook"
   chmod 700 "$ROOT/secrets"
-  pass "created ignored runtime directories"
+  chmod 600 "$ROOT/secrets/rclone_config_pass" "$ROOT/secrets/docksync_error_webhook"
+  pass "created ignored runtime directories and secret placeholders"
 fi
 
 if command -v node >/dev/null 2>&1; then
@@ -93,6 +96,7 @@ fi
 
 for file in \
   "$ROOT/config/docksync.env.example" \
+  "$ROOT/docker-compose.secrets.yml" \
   "$ROOT/docker-compose.yml" \
   "$ROOT/Dockerfile" \
   "$ROOT/README.md" \
@@ -117,6 +121,25 @@ else
   fail "config/docksync.env.example is missing Rclone settings"
 fi
 
+if [ -n "$DOCKER" ] && "$DOCKER" compose version >/dev/null 2>&1; then
+  if (cd "$ROOT" && "$DOCKER" compose -f docker-compose.yml config >/dev/null 2>&1); then
+    pass "base Docker Compose configuration is valid"
+  else
+    fail "base Docker Compose configuration is invalid"
+  fi
+  if [ -f "$ROOT/secrets/rclone_config_pass" ] && [ -f "$ROOT/secrets/docksync_error_webhook" ]; then
+    if (cd "$ROOT" && "$DOCKER" compose -f docker-compose.yml -f docker-compose.secrets.yml config >/dev/null 2>&1); then
+      pass "Docker Compose secrets override is valid"
+    else
+      fail "Docker Compose secrets override is invalid"
+    fi
+  else
+    warn "skipping secrets override validation until optional secret files exist"
+  fi
+else
+  warn "Docker Compose plugin not available; skipping Compose config validation"
+fi
+
 for dir in data state rclone secrets; do
   if [ -d "$ROOT/$dir" ]; then
     pass "local $dir/ directory exists"
@@ -131,10 +154,52 @@ else
   warn "rclone/rclone.conf is missing until Proton Drive is configured with rclone"
 fi
 
-if npm pack --dry-run --json | grep -Eq 'PROMPT|data;C|state;C|secrets|rclone.conf|docker-test|[.]github'; then
-  fail "npm package dry-run includes ignored local or CI material"
+if [ -s "$ROOT/secrets/rclone_config_pass" ]; then
+  pass "optional Rclone config passphrase secret is configured"
+elif [ -f "$ROOT/secrets/rclone_config_pass" ]; then
+  warn "secrets/rclone_config_pass is empty; leave it empty unless rclone.conf is encrypted"
 else
+  warn "secrets/rclone_config_pass is missing; run npm run onboard to create a placeholder"
+fi
+
+if [ -s "$ROOT/secrets/docksync_error_webhook" ]; then
+  pass "optional error webhook secret is configured"
+elif [ -f "$ROOT/secrets/docksync_error_webhook" ]; then
+  warn "secrets/docksync_error_webhook is empty; leave it empty unless webhook notifications are enabled"
+else
+  warn "secrets/docksync_error_webhook is missing; run npm run onboard to create a placeholder"
+fi
+
+if PACK_BAD="$(npm pack --dry-run --json | node -e '
+let input = "";
+process.stdin.on("data", (chunk) => {
+  input += chunk;
+});
+process.stdin.on("end", () => {
+  const packages = JSON.parse(input);
+  const files = packages.flatMap((pkg) => pkg.files || []).map((file) => file.path);
+  const bad = files.filter((file) =>
+    file === "PROMPT.md" ||
+    file === "rclone/rclone.conf" ||
+    file.startsWith(".github/") ||
+    file.startsWith("data/") ||
+    file.startsWith("state/") ||
+    file.startsWith("secrets/") ||
+    file.startsWith("docker-test/") ||
+    file.startsWith("tmp/") ||
+    file.startsWith("data;C") ||
+    file.startsWith("state;C") ||
+    file.startsWith("rclone;C")
+  );
+  for (const file of bad) {
+    console.log(file);
+  }
+  process.exit(bad.length === 0 ? 0 : 1);
+});
+')"; then
   pass "npm package dry-run excludes local secrets and generated data"
+else
+  fail "npm package dry-run includes ignored local or CI material: ${PACK_BAD:-unknown file}"
 fi
 
 if [ "$FAILURES" -gt 0 ]; then
