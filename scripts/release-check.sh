@@ -109,11 +109,11 @@ for i in {1..60}; do
   fi
 done
 
-curl -fsS "http://127.0.0.1:$PORT/" | rg -q 'DockSync Console'
-curl -fsS "http://127.0.0.1:$PORT/styles.css" | rg -q -- '--font-protonserif'
-curl -fsS "http://127.0.0.1:$PORT/variables.css" | rg -q -- '--color-action-violet'
-curl -fsS "http://127.0.0.1:$PORT/theme.css" | rg -q '@theme'
-curl -fsS "http://127.0.0.1:$PORT/tokens.json" | rg -q 'privacy-violet'
+curl -fsS "http://127.0.0.1:$PORT/" | grep -q 'DockSync Console'
+curl -fsS "http://127.0.0.1:$PORT/styles.css" | grep -q -- '--font-protonserif'
+curl -fsS "http://127.0.0.1:$PORT/variables.css" | grep -q -- '--color-action-violet'
+curl -fsS "http://127.0.0.1:$PORT/theme.css" | grep -q '@theme'
+curl -fsS "http://127.0.0.1:$PORT/tokens.json" | grep -q 'privacy-violet'
 curl -fsS "http://127.0.0.1:$PORT/healthz" | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const h=JSON.parse(data); process.exit(h.ok ? 0 : 1); });'
 
 printf 'release manual\n' > "$TEST_ROOT/local/release-manual.txt"
