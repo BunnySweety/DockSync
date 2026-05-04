@@ -11,6 +11,8 @@ const config = loadConfig();
 const status = {
   startedAt: new Date().toISOString(),
   shuttingDown: false,
+  backendReady: false,
+  backendError: null,
   lastSync: null,
   history: [],
 };
@@ -25,6 +27,56 @@ function serializeSyncResult(result) {
     actionCount: result.actions?.length || 0,
     actions: result.actions?.map((action) => ({ type: action.type, path: action.path })) || [],
   };
+}
+
+class RuntimeSyncEngine {
+  constructor(config, logger, status) {
+    this.config = config;
+    this.logger = logger;
+    this.status = status;
+    this.engine = null;
+    this.initPromise = null;
+    this.running = false;
+  }
+
+  async ensureEngine() {
+    if (this.engine) {
+      return this.engine;
+    }
+    if (!this.initPromise) {
+      this.status.backendReady = false;
+      this.status.backendError = null;
+      this.initPromise = createRemoteBackend(this.config, this.logger)
+        .then((remoteBackend) => {
+          this.engine = new SyncEngine(this.config, this.logger, remoteBackend);
+          this.status.backendReady = true;
+          this.status.backendError = null;
+          return this.engine;
+        })
+        .catch((error) => {
+          this.status.backendReady = false;
+          this.status.backendError = error.message;
+          throw error;
+        })
+        .finally(() => {
+          this.initPromise = null;
+        });
+    }
+    return this.initPromise;
+  }
+
+  async syncOnce(reason = 'scheduled') {
+    if (this.running) {
+      throw new Error('sync already running');
+    }
+    this.running = true;
+    try {
+      const engine = await this.ensureEngine();
+      return await engine.syncOnce(reason);
+    } finally {
+      this.running = false;
+    }
+  }
 }
 
 async function runSyncWithRetry(engine, reason) {
@@ -45,8 +97,7 @@ async function main() {
     remotePath: config.remotePath,
   });
 
-  const remoteBackend = await createRemoteBackend(config, logger);
-  const engine = new SyncEngine(config, logger, remoteBackend);
+  const engine = new RuntimeSyncEngine(config, logger, status);
   const server = startServer(config, logger, engine, status);
 
   const stop = async (signalName) => {

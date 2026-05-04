@@ -165,14 +165,15 @@ function mergeSyncHistory(status) {
 function renderStatus() {
   const status = state.status || {};
   const config = status.config || {};
-  const healthy = state.health?.ok && !status.shuttingDown;
   const running = Boolean(status.running);
+  const setupNeeded = Boolean(status.backendError) || Boolean(state.onboarding && !state.onboarding.ok);
+  const healthy = state.health?.ok && !status.shuttingDown && !setupNeeded;
   const manualEnabled = config.manualSyncEnabled !== false;
 
-  elements.topStatus.textContent = running ? 'Sync running' : healthy ? 'Healthy' : 'Needs attention';
+  elements.topStatus.textContent = running ? 'Sync running' : setupNeeded ? 'Setup needed' : healthy ? 'Healthy' : 'Needs attention';
   elements.topStatus.classList.toggle('is-ok', healthy);
   elements.topStatus.classList.toggle('is-bad', !healthy);
-  elements.health.textContent = running ? 'Running' : healthy ? 'Healthy' : 'Unavailable';
+  elements.health.textContent = running ? 'Running' : setupNeeded ? 'Setup needed' : healthy ? 'Healthy' : 'Unavailable';
   elements.backend.textContent = status.backend || 'rclone';
   elements.localPath.textContent = status.localPath || '/data';
   elements.remotePath.textContent = status.remotePath || '/DockSync';

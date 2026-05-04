@@ -103,13 +103,28 @@ esac
 SH
 chmod +x "$TMP_DIR/bin/rclone"
 
+free_port() {
+  node <<'NODE'
+const net = require('node:net');
+const server = net.createServer();
+server.listen(0, '127.0.0.1', () => {
+  console.log(server.address().port);
+  server.close();
+});
+NODE
+}
+
 run_sync() {
+  local port
+  port="$(free_port)"
   SYNC_BACKEND=rclone \
   SYNC_LOCAL_PATH="$TMP_DIR/local" \
   RCLONE_BINARY="$TMP_DIR/bin/rclone" \
   RCLONE_REMOTE=":local:$TMP_DIR/remote" \
   RCLONE_CONFIG="$TMP_DIR/rclone.conf" \
   STATE_DIR="$TMP_DIR/state" \
+  API_HOST=127.0.0.1 \
+  API_PORT="$port" \
   SYNC_ONCE=true \
   ENABLE_REST_API=false \
   node "$ROOT/src/index.js" >/tmp/docksync-test.log

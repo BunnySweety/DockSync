@@ -75,7 +75,7 @@ async function inspectPath(filePath) {
   }
 }
 
-async function summarizeOnboarding(config) {
+async function summarizeOnboarding(config, status) {
   const [localPath, stateDir, rcloneConfig] = await Promise.all([
     inspectPath(config.localPath),
     inspectPath(config.stateDir),
@@ -101,6 +101,14 @@ async function summarizeOnboarding(config) {
       detail: rcloneReady
         ? `Rclone can use ${localRemote ? config.rclone.remote : config.rclone.configPath}.`
         : `Create a Proton Drive remote and mount rclone.conf at ${config.rclone.configPath}.`,
+    },
+    {
+      id: 'backend-init',
+      label: 'Backend initialization',
+      status: status.backendReady ? 'ready' : status.backendError ? 'action' : 'optional',
+      detail: status.backendReady
+        ? 'Rclone backend initialized successfully.'
+        : status.backendError || 'Waiting for the first backend initialization attempt.',
     },
     {
       id: 'encrypted-config',
@@ -227,6 +235,8 @@ export function startServer(config, logger, engine, status) {
         localPath: config.localPath,
         remotePath: config.remotePath,
         syncIntervalSeconds: config.syncIntervalMs / 1000,
+        backendReady: Boolean(status.backendReady),
+        backendError: status.backendError || null,
         running: engine.running,
         lastSync: status.lastSync,
         history: status.history || [],
@@ -243,7 +253,7 @@ export function startServer(config, logger, engine, status) {
     }
 
     if (request.method === 'GET' && request.url === '/onboarding') {
-      sendJson(response, 200, await summarizeOnboarding(config));
+      sendJson(response, 200, await summarizeOnboarding(config, status));
       return;
     }
 

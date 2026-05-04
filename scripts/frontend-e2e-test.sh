@@ -4,11 +4,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 SERVER_PID=""
+MISSING_CONFIG_SERVER_PID=""
 
 cleanup() {
   if [ -n "$SERVER_PID" ]; then
     kill "$SERVER_PID" >/dev/null 2>&1 || true
     wait "$SERVER_PID" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$MISSING_CONFIG_SERVER_PID" ]; then
+    kill "$MISSING_CONFIG_SERVER_PID" >/dev/null 2>&1 || true
+    wait "$MISSING_CONFIG_SERVER_PID" >/dev/null 2>&1 || true
   fi
   rm -rf "$TMP_DIR"
 }
@@ -233,6 +238,130 @@ async function waitFor(predicate, label) {
   assert(manualStatus.history?.length >= 2, 'manual sync appends sync history');
   assert(manualStatus.lastSync.actions.some((action) => action.type === 'upload' && action.path === 'manual-e2e.txt'), 'manual sync reports uploaded file');
   await fs.access(path.join(tmpDir, 'remote', 'manual-e2e.txt'));
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+NODE
+
+kill "$SERVER_PID" >/dev/null 2>&1 || true
+wait "$SERVER_PID" >/dev/null 2>&1 || true
+SERVER_PID=""
+
+MISSING_CONFIG_PORT="$(
+  node <<'NODE'
+const net = require('node:net');
+const server = net.createServer();
+server.listen(0, '127.0.0.1', () => {
+  console.log(server.address().port);
+  server.close();
+});
+NODE
+)"
+
+mkdir -p "$TMP_DIR/missing-bin" "$TMP_DIR/missing-local" "$TMP_DIR/missing-state"
+cat > "$TMP_DIR/missing-bin/rclone" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_path=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --config)
+      config_path="$2"
+      shift 2
+      ;;
+    --bwlimit|--checkers|--transfers)
+      shift 2
+      ;;
+    --*)
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+cmd="${1:-}"
+case "$cmd" in
+  version)
+    echo "rclone v-test"
+    ;;
+  mkdir)
+    if [ ! -f "$config_path" ]; then
+      echo "NOTICE: Config file \"$config_path\" not found - using defaults" >&2
+      echo "CRITICAL: Failed to create file system for \"proton:DockSync\": didn't find section in config file (\"proton\")" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "unsupported rclone command: $cmd" >&2
+    exit 2
+    ;;
+esac
+SH
+chmod +x "$TMP_DIR/missing-bin/rclone"
+
+SYNC_BACKEND=rclone \
+SYNC_LOCAL_PATH="$TMP_DIR/missing-local" \
+RCLONE_BINARY="$TMP_DIR/missing-bin/rclone" \
+RCLONE_REMOTE="proton:" \
+RCLONE_CONFIG="$TMP_DIR/missing-rclone.conf" \
+STATE_DIR="$TMP_DIR/missing-state" \
+API_HOST=127.0.0.1 \
+API_PORT="$MISSING_CONFIG_PORT" \
+SYNC_INTERVAL_SECONDS=3600 \
+RETRY_MAX_ATTEMPTS=1 \
+ENABLE_REST_API=true \
+node "$ROOT/src/index.js" > "$TMP_DIR/missing-server.log" 2>&1 &
+MISSING_CONFIG_SERVER_PID="$!"
+
+node - "$MISSING_CONFIG_PORT" <<'NODE'
+let baseUrl;
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+async function getJson(route) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    headers: { accept: 'application/json' },
+  });
+  assert(response.ok, `${route} returned ${response.status}`);
+  return response.json();
+}
+
+async function waitFor(predicate, label) {
+  const started = Date.now();
+  let lastError;
+  while (Date.now() - started < 10000) {
+    try {
+      const result = await predicate();
+      if (result) return result;
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error(`timed out waiting for ${label}${lastError ? `: ${lastError.message}` : ''}`);
+}
+
+(async () => {
+  baseUrl = `http://127.0.0.1:${process.argv[2]}`;
+  const status = await waitFor(async () => {
+    const nextStatus = await getJson('/status');
+    return nextStatus.backendError ? nextStatus : null;
+  }, 'backend error without rclone config');
+  assert(status.ok === true, 'HTTP server remains healthy when backend setup is incomplete');
+  assert(status.backendReady === false, 'backend is not marked ready without rclone config');
+
+  const onboarding = await getJson('/onboarding');
+  assert(onboarding.ok === false, 'onboarding reports incomplete setup');
+  assert(onboarding.checks?.some((check) => check.id === 'rclone-config' && check.status === 'action'), 'onboarding flags missing rclone config');
+  assert(onboarding.checks?.some((check) => check.id === 'backend-init' && check.status === 'action'), 'onboarding flags backend init error');
 })().catch((error) => {
   console.error(error);
   process.exit(1);
