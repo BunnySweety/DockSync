@@ -51,9 +51,7 @@ trap cleanup EXIT
 DOCKER="$(find_docker)"
 PORT="$(free_port)"
 
-while IFS= read -r -d '' file; do
-  node --check "$file"
-done < <(find "$ROOT/src" "$ROOT/public" -name '*.js' -print0)
+npm run check
 npm test
 
 rm -rf "$TEST_ROOT"

@@ -16,16 +16,17 @@ DockSync is a Node.js sync service packaged as a rootless distroless Docker imag
 - `npm install` validates the lockfile and prepares the local Node workspace.
 - `npm start` runs the service with environment configuration.
 - `SYNC_BACKEND=rclone SYNC_ONCE=true npm start` runs a one-shot sync using the configured Rclone remote.
+- `npm run check` syntax-checks JavaScript under `src/` and `public/`.
 - `npm test` runs the frontend theme contract, sandbox sync, and frontend e2e tests.
 - `npm run release:check` builds and smoke-tests the hardened Docker image.
 - `docker compose up --build` builds and runs the Rclone-enabled container.
 - `docker build -t docksync:local .` builds the distroless image directly.
 
-Use `python3 -m json.tool tokens.json >/dev/null` when editing design tokens. Keep `data/`, `state/`, `rclone/`, `secrets/`, and `docker-test/` as ignored local-only directories.
+Use `python3 -m json.tool tokens.json >/dev/null` when editing tokens. Keep `data/`, `state/`, `rclone/`, `secrets/`, and `docker-test/` local-only.
 
 ## Coding Style & Naming Conventions
 
-Use ES modules and two-space indentation for JavaScript, JSON, and CSS. Prefer small modules with explicit imports from `node:*` built-ins. Environment variables use uppercase snake case, for example `SYNC_LOCAL_PATH`, `SYNC_BACKEND`, and `RCLONE_REMOTE`. Token names stay lowercase and hyphenated, for example `privacy-violet` and `section-gap`.
+Use ES modules and two-space indentation for JavaScript, JSON, and CSS. Prefer explicit imports from `node:*` built-ins. Environment variables use uppercase snake case, for example `SYNC_LOCAL_PATH`, `SYNC_BACKEND`, and `RCLONE_REMOTE`. Token names stay lowercase and hyphenated, for example `privacy-violet`.
 
 ## Testing Guidelines
 
@@ -37,4 +38,4 @@ Git history was unavailable in this environment, so use concise imperative commi
 
 ## Agent-Specific Instructions
 
-Keep edits small and verify `npm test` after service changes. Do not commit credentials, Rclone configs, state directories, mounted data, or `node_modules`. Store Proton/Rclone secrets in Docker secrets or another external secret manager.
+Keep edits small and verify `npm test` after service changes. Do not commit credentials, Rclone configs, state directories, data, or `node_modules`. Store Proton/Rclone secrets in Docker secrets or another external secret manager.
