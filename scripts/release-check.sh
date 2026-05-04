@@ -113,6 +113,7 @@ curl -fsS "http://127.0.0.1:$PORT/variables.css" | grep -q -- '--color-action-vi
 curl -fsS "http://127.0.0.1:$PORT/theme.css" | grep -q '@theme'
 curl -fsS "http://127.0.0.1:$PORT/tokens.json" | grep -q 'privacy-violet'
 curl -fsS "http://127.0.0.1:$PORT/healthz" | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const h=JSON.parse(data); process.exit(h.ok ? 0 : 1); });'
+curl -fsS "http://127.0.0.1:$PORT/onboarding" | node -e 'let data=""; process.stdin.on("data", c => data += c); process.stdin.on("end", () => { const o=JSON.parse(data); process.exit(o.ok && o.commands?.some((item) => item.id === "deploy-compose") ? 0 : 1); });'
 
 printf 'release manual\n' > "$TEST_ROOT/local/release-manual.txt"
 curl -fsS -X POST "http://127.0.0.1:$PORT/sync" >/dev/null

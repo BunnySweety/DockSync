@@ -196,16 +196,23 @@ async function waitFor(predicate, label) {
 
   const health = await getJson('/healthz');
   assert(health.ok === true, 'health endpoint is healthy');
+  const onboarding = await getJson('/onboarding');
+  assert(onboarding.ok === true, 'onboarding endpoint reports local fixture ready');
+  assert(onboarding.checks?.some((check) => check.id === 'runtime-mounts' && check.status === 'ready'), 'onboarding reports runtime mounts');
+  assert(onboarding.checks?.some((check) => check.id === 'rclone-config' && check.status === 'ready'), 'onboarding reports rclone config');
+  assert(onboarding.commands?.some((item) => item.id === 'deploy-compose' && item.command.includes('docker compose')), 'onboarding exposes deploy command');
 
   const indexHtml = await getText('/');
   assert(indexHtml.includes('DockSync Console'), 'frontend document title is served');
   assert(indexHtml.includes('href="/variables.css"'), 'frontend loads variables.css');
   assert(indexHtml.includes('id="syncButton"'), 'frontend exposes sync button');
   assert(indexHtml.includes('id="activityRows"'), 'frontend exposes activity list');
+  assert(indexHtml.includes('id="onboardingChecks"'), 'frontend exposes onboarding checklist');
 
   const styles = await getText('/styles.css');
   assert(styles.includes('var(--font-protonserif)'), 'frontend styles consume heading font token');
   assert(styles.includes('var(--radius-cards)'), 'frontend styles consume card radius token');
+  assert(styles.includes('.onboarding-panel'), 'frontend styles onboarding panel');
 
   const variables = await getText('/variables.css');
   assert(variables.includes('--color-action-violet'), 'variables.css is served');

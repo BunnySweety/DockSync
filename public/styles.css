@@ -141,6 +141,7 @@ svg {
 
 h1,
 h2,
+h3,
 p {
   margin: 0;
 }
@@ -159,6 +160,13 @@ h2 {
   font-size: var(--text-heading-sm);
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-heading-sm);
+}
+
+h3 {
+  color: var(--text);
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--leading-body);
 }
 
 .topbar-actions {
@@ -327,6 +335,163 @@ h2 {
 
 .panel-header.compact {
   display: block;
+}
+
+.onboarding-panel {
+  margin-top: var(--spacing-20);
+}
+
+.setup-progress {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 var(--spacing-12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-buttons);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.setup-progress.is-ok {
+  border-color: color-mix(in srgb, var(--ok) 32%, var(--border));
+  background: color-mix(in srgb, var(--ok) 10%, var(--bg));
+  color: var(--ok);
+}
+
+.setup-progress.is-action {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--border));
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg));
+  color: var(--warn);
+}
+
+.onboarding-checks {
+  display: grid;
+}
+
+.check-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: var(--spacing-16);
+  align-items: center;
+  min-height: 64px;
+  padding: var(--spacing-12) var(--card-padding);
+  border-bottom: 1px solid var(--border);
+}
+
+.check-row strong {
+  display: block;
+  color: var(--text);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.check-row p {
+  margin-top: var(--spacing-4);
+  color: var(--color-iron-gray);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.check-status {
+  justify-self: end;
+  padding: var(--spacing-4) var(--spacing-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-buttons);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.check-row.ready .check-status {
+  border-color: color-mix(in srgb, var(--ok) 32%, var(--border));
+  color: var(--ok);
+}
+
+.check-row.action .check-status {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--border));
+  color: var(--warn);
+}
+
+.command-list {
+  padding: var(--card-padding);
+}
+
+.command-list-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-16);
+  margin-bottom: var(--spacing-12);
+}
+
+.command-list-header p {
+  color: var(--muted);
+  font-size: var(--text-body-sm);
+}
+
+.command-block {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.command-block + .command-block {
+  margin-top: var(--spacing-12);
+}
+
+.command-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+  min-height: 40px;
+  padding: 0 var(--spacing-12);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.command-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  min-height: 28px;
+  padding: 0 var(--spacing-8);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--bg);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.command-copy svg {
+  width: 15px;
+  height: 15px;
+}
+
+.command-copy:hover,
+.command-copy:focus-visible {
+  color: var(--accent-strong);
+  outline: none;
+}
+
+.command-block pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: var(--spacing-12);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body);
+  white-space: pre;
 }
 
 .segmented-control {
@@ -539,6 +704,7 @@ h2 {
   }
 
   .status-band,
+  .onboarding-panel,
   .workspace-grid,
   .footer-strip,
   .panel {
@@ -594,6 +760,36 @@ h2 {
     flex-direction: column;
   }
 
+  .setup-progress {
+    justify-content: center;
+  }
+
+  .check-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-8);
+  }
+
+  .check-status {
+    justify-self: start;
+  }
+
+  .command-list-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--spacing-4);
+  }
+
+  .command-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: var(--spacing-12);
+  }
+
+  .command-copy {
+    width: 100%;
+    justify-content: center;
+  }
+
   .segmented-control {
     width: 100%;
     overflow-x: auto;
@@ -627,7 +823,7 @@ h2 {
     position: static;
     z-index: 10;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     overflow: hidden;
     margin: 0 var(--spacing-16) var(--spacing-16);
     border: 1px solid var(--border-strong);

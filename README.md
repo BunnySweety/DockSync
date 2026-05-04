@@ -107,7 +107,7 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
 ```
 
-Open `http://localhost:8080/` to view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`.
+Open `http://localhost:8080/` to follow the onboarding checklist, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`.
 
 ## Configuration
 
@@ -141,7 +141,7 @@ This builds the Docker image, runs it with a read-only root filesystem, rootless
 
 ## Deployment
 
-Use `DEPLOYMENT.md` for a step-by-step deployment checklist. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with Compose.
+Use `DEPLOYMENT.md` for a step-by-step deployment checklist. The frontend also exposes the same host commands and readiness checks at `GET /onboarding`. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with Compose.
 
 ## Security Notes
 

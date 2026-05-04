@@ -108,6 +108,7 @@ For direct `docker run` with an encrypted Rclone config, add:
 ```
 
 Open `http://127.0.0.1:8080/` for the web console.
+Use the Onboarding section to confirm runtime mounts, Rclone config visibility, optional secrets, and the manual sync API from the running container.
 
 ## 5. Operations
 

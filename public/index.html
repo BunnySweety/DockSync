@@ -21,6 +21,10 @@
             <svg viewBox="0 0 24 24"><path d="M4 13h5l2-7 4 12 2-5h3"/></svg>
             <span>Status</span>
           </a>
+          <a class="nav-item" href="#onboarding">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/><path d="M5 5v14"/></svg>
+            <span>Onboarding</span>
+          </a>
           <a class="nav-item" href="#activity">
             <svg viewBox="0 0 24 24"><path d="M7 7h10M7 12h10M7 17h6"/></svg>
             <span>Activity</span>
@@ -71,6 +75,24 @@
             <div class="status-cell">
               <span class="label">Next sync</span>
               <strong id="nextSyncValue">Waiting</strong>
+            </div>
+          </section>
+
+          <section id="onboarding" class="panel onboarding-panel" aria-label="Onboarding checklist">
+            <div class="panel-header">
+              <div>
+                <h2>Onboarding</h2>
+                <p id="onboardingSummary">Checking setup inputs.</p>
+              </div>
+              <span id="onboardingProgress" class="setup-progress">Checking</span>
+            </div>
+            <div id="onboardingChecks" class="onboarding-checks"></div>
+            <div class="command-list" aria-label="Setup commands">
+              <div class="command-list-header">
+                <h3>Setup commands</h3>
+                <p>Run these on the host that owns the checkout.</p>
+              </div>
+              <div id="onboardingCommands"></div>
             </div>
           </section>
 
@@ -138,6 +160,7 @@
 
     <nav class="mobile-nav" aria-label="Mobile navigation">
       <a href="#status">Status</a>
+      <a href="#onboarding">Onboard</a>
       <a href="#activity">Activity</a>
       <a href="#settings">Config</a>
     </nav>

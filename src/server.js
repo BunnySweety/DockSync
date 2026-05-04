@@ -42,6 +42,126 @@ function recordSyncResult(status, result) {
   status.history = [summary, ...(status.history || [])].slice(0, 20);
 }
 
+async function inspectPath(filePath) {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    let readable = true;
+    let writable = true;
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK);
+    } catch {
+      readable = false;
+    }
+    try {
+      await fs.promises.access(filePath, fs.constants.W_OK);
+    } catch {
+      writable = false;
+    }
+    return {
+      exists: true,
+      readable,
+      writable,
+      type: stat.isDirectory() ? 'directory' : 'file',
+      size: stat.size,
+    };
+  } catch {
+    return {
+      exists: false,
+      readable: false,
+      writable: false,
+      type: 'missing',
+      size: 0,
+    };
+  }
+}
+
+async function summarizeOnboarding(config) {
+  const [localPath, stateDir, rcloneConfig] = await Promise.all([
+    inspectPath(config.localPath),
+    inspectPath(config.stateDir),
+    inspectPath(config.rclone.configPath),
+  ]);
+  const localRemote = config.rclone.remote.startsWith(':local:');
+  const runtimeReady = localPath.exists && localPath.writable && stateDir.exists && stateDir.writable;
+  const rcloneReady = localRemote || (rcloneConfig.exists && rcloneConfig.readable);
+
+  const checks = [
+    {
+      id: 'runtime-mounts',
+      label: 'Runtime mounts',
+      status: runtimeReady ? 'ready' : 'action',
+      detail: runtimeReady
+        ? `${config.localPath} and ${config.stateDir} are writable.`
+        : `Mount writable host directories at ${config.localPath} and ${config.stateDir}.`,
+    },
+    {
+      id: 'rclone-config',
+      label: 'Rclone config',
+      status: rcloneReady ? 'ready' : 'action',
+      detail: rcloneReady
+        ? `Rclone can use ${localRemote ? config.rclone.remote : config.rclone.configPath}.`
+        : `Create a Proton Drive remote and mount rclone.conf at ${config.rclone.configPath}.`,
+    },
+    {
+      id: 'encrypted-config',
+      label: 'Encrypted Rclone config',
+      status: config.rclone.configPass ? 'ready' : 'optional',
+      detail: config.rclone.configPass
+        ? 'RCLONE_CONFIG_PASS is provided from an environment variable or secret file.'
+        : 'Only required when rclone.conf is encrypted.',
+    },
+    {
+      id: 'webhook-secret',
+      label: 'Error webhook',
+      status: config.notificationWebhookUrl ? 'ready' : 'optional',
+      detail: config.notificationWebhookUrl
+        ? 'Error webhook notifications are configured.'
+        : 'Optional. Store the URL in secrets/docksync_error_webhook before using the Compose secrets override.',
+    },
+    {
+      id: 'manual-sync',
+      label: 'Manual sync API',
+      status: config.api.manualSyncEnabled ? 'ready' : 'optional',
+      detail: config.api.manualSyncEnabled
+        ? 'POST /sync is enabled for the Sync now button.'
+        : 'Set ENABLE_REST_API=true to enable frontend-triggered syncs.',
+    },
+  ];
+
+  return {
+    ok: checks.every((check) => check.status !== 'action'),
+    generatedAt: new Date().toISOString(),
+    paths: {
+      localPath,
+      stateDir,
+      rcloneConfig,
+    },
+    checks,
+    commands: [
+      {
+        id: 'host-preflight',
+        label: 'Prepare host workspace',
+        command: 'npm ci\nnpm run onboard',
+      },
+      {
+        id: 'proton-rclone',
+        label: 'Authenticate Proton Drive with Rclone',
+        command: 'rclone config\nrclone lsd proton:\ncp ~/.config/rclone/rclone.conf rclone/rclone.conf\nchmod 600 rclone/rclone.conf',
+      },
+      {
+        id: 'optional-secrets',
+        label: 'Fill optional secret files',
+        command: "printf '%s\\n' 'your-rclone-config-passphrase' > secrets/rclone_config_pass\nprintf '%s\\n' 'https://example.invalid/webhook' > secrets/docksync_error_webhook\nchmod 600 secrets/rclone_config_pass secrets/docksync_error_webhook",
+      },
+      {
+        id: 'deploy-compose',
+        label: 'Deploy with Compose',
+        command: 'npm run release:check\ndocker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d\ncurl -fsS http://127.0.0.1:8080/healthz',
+      },
+    ],
+  };
+}
+
 async function serveStatic(request, response) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return false;
@@ -119,6 +239,11 @@ export function startServer(config, logger, engine, status) {
           rcloneSerialTransfers: config.rclone.disableCheckers,
         },
       });
+      return;
+    }
+
+    if (request.method === 'GET' && request.url === '/onboarding') {
+      sendJson(response, 200, await summarizeOnboarding(config));
       return;
     }
 

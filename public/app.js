@@ -12,6 +12,10 @@ const elements = {
   localPath: document.querySelector('#localPathValue'),
   manualApi: document.querySelector('#manualApiValue'),
   nextSync: document.querySelector('#nextSyncValue'),
+  onboardingChecks: document.querySelector('#onboardingChecks'),
+  onboardingCommands: document.querySelector('#onboardingCommands'),
+  onboardingProgress: document.querySelector('#onboardingProgress'),
+  onboardingSummary: document.querySelector('#onboardingSummary'),
   refreshButton: document.querySelector('#refreshButton'),
   rcloneRemote: document.querySelector('#rcloneRemoteValue'),
   remotePath: document.querySelector('#remotePathValue'),
@@ -26,6 +30,7 @@ const state = {
   activity: loadActivity(),
   filter: 'all',
   health: null,
+  onboarding: null,
   status: null,
 };
 
@@ -122,6 +127,12 @@ function labelAction(type) {
     .join(' ');
 }
 
+function labelCheckStatus(status) {
+  if (status === 'ready') return 'Ready';
+  if (status === 'optional') return 'Optional';
+  return 'Action needed';
+}
+
 function mergeActivity(lastSync) {
   if (!lastSync?.finishedAt) return;
   const actions = lastSync.actions?.length
@@ -187,6 +198,50 @@ function renderStatus() {
   elements.syncButton.querySelector('span').textContent = running ? 'Syncing' : 'Sync now';
 }
 
+function renderOnboarding() {
+  const onboarding = state.onboarding;
+  if (!onboarding) {
+    elements.onboardingSummary.textContent = 'Checking setup inputs.';
+    elements.onboardingProgress.textContent = 'Checking';
+    elements.onboardingProgress.className = 'setup-progress';
+    elements.onboardingChecks.innerHTML = '<div class="empty-state">Loading onboarding checks.</div>';
+    elements.onboardingCommands.innerHTML = '';
+    return;
+  }
+
+  const checks = onboarding.checks || [];
+  const requiredChecks = checks.filter((check) => check.status !== 'optional');
+  const readyRequired = requiredChecks.filter((check) => check.status === 'ready').length;
+  elements.onboardingSummary.textContent = onboarding.ok
+    ? 'Required setup inputs are ready for this running service.'
+    : 'Complete the action items, then refresh this page.';
+  elements.onboardingProgress.textContent = `${readyRequired}/${requiredChecks.length} ready`;
+  elements.onboardingProgress.className = `setup-progress ${onboarding.ok ? 'is-ok' : 'is-action'}`;
+
+  elements.onboardingChecks.innerHTML = checks.map((check) => `
+    <div class="check-row ${escapeHtml(check.status)}">
+      <div>
+        <strong>${escapeHtml(check.label)}</strong>
+        <p>${escapeHtml(check.detail)}</p>
+      </div>
+      <span class="check-status">${labelCheckStatus(check.status)}</span>
+    </div>
+  `).join('');
+
+  elements.onboardingCommands.innerHTML = (onboarding.commands || []).map((item) => `
+    <section class="command-block" aria-label="${escapeHtml(item.label)}">
+      <div class="command-header">
+        <span>${escapeHtml(item.label)}</span>
+        <button class="command-copy" type="button" data-command-id="${escapeHtml(item.id)}" aria-label="Copy ${escapeHtml(item.label)} command">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>Copy</span>
+        </button>
+      </div>
+      <pre><code>${escapeHtml(item.command)}</code></pre>
+    </section>
+  `).join('');
+}
+
 function renderActivity() {
   const filtered = state.filter === 'all'
     ? state.activity
@@ -212,6 +267,7 @@ function renderActivity() {
 
 function render() {
   renderStatus();
+  renderOnboarding();
   renderActivity();
 }
 
@@ -227,12 +283,14 @@ function escapeHtml(value) {
 async function refreshStatus({ silent = false } = {}) {
   elements.refreshButton.disabled = true;
   try {
-    const [status, health] = await Promise.all([
+    const [status, health, onboarding] = await Promise.all([
       requestJson('/status'),
       requestJson('/healthz').catch(() => ({ ok: false })),
+      requestJson('/onboarding').catch(() => null),
     ]);
     state.status = status;
     state.health = health;
+    state.onboarding = onboarding;
     mergeSyncHistory(status);
     render();
     if (!silent) showToast('Status refreshed');
@@ -269,6 +327,18 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
 
 elements.refreshButton.addEventListener('click', () => refreshStatus());
 elements.syncButton.addEventListener('click', triggerSync);
+elements.onboardingCommands.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-command-id]');
+  if (!button) return;
+  const command = state.onboarding?.commands?.find((item) => item.id === button.dataset.commandId)?.command;
+  if (!command) return;
+  try {
+    await navigator.clipboard.writeText(command);
+    showToast('Command copied');
+  } catch {
+    showToast('Clipboard is unavailable');
+  }
+});
 
 refreshStatus({ silent: true });
 window.setInterval(() => refreshStatus({ silent: true }), 15000);
