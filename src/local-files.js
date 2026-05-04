@@ -10,18 +10,45 @@ export async function sha1File(filePath) {
   return hash.digest('hex');
 }
 
+export function normalizeRelativePath(relativePath) {
+  const value = String(relativePath ?? '');
+  if (!value || value.includes('\0')) {
+    throw new Error(`Unsafe relative path: ${value}`);
+  }
+  const withPosixSeparators = value.replace(/\\/g, '/');
+  if (path.posix.isAbsolute(withPosixSeparators)) {
+    throw new Error(`Unsafe relative path: ${value}`);
+  }
+  const normalized = path.posix.normalize(withPosixSeparators);
+  if (normalized === '.' || normalized === '..' || normalized.startsWith('../')) {
+    throw new Error(`Unsafe relative path: ${value}`);
+  }
+  return normalized;
+}
+
+export function resolveInsideRoot(root, relativePath) {
+  const normalized = normalizeRelativePath(relativePath);
+  const rootPath = path.resolve(root);
+  const resolved = path.resolve(rootPath, normalized);
+  const relativeToRoot = path.relative(rootPath, resolved);
+  if (!relativeToRoot || relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+    throw new Error(`Unsafe relative path: ${relativePath}`);
+  }
+  return resolved;
+}
+
 export async function listLocalFiles(root) {
   const files = {};
 
   async function walk(relativeDir) {
-    const absoluteDir = path.join(root, relativeDir);
+    const absoluteDir = relativeDir ? resolveInsideRoot(root, relativeDir) : path.resolve(root);
     const entries = await fs.promises.readdir(absoluteDir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name.startsWith('.docksync.tmp-')) {
         continue;
       }
-      const relativePath = path.posix.join(relativeDir.split(path.sep).join(path.posix.sep), entry.name);
-      const absolutePath = path.join(root, relativePath);
+      const relativePath = normalizeRelativePath(path.posix.join(relativeDir.split(path.sep).join(path.posix.sep), entry.name));
+      const absolutePath = resolveInsideRoot(root, relativePath);
       if (entry.isDirectory()) {
         await walk(relativePath);
       } else if (entry.isFile()) {
@@ -53,7 +80,7 @@ export async function ensureParentDirectory(filePath) {
 }
 
 export function conflictPath(relativePath, side, date = new Date()) {
-  const parsed = path.posix.parse(relativePath);
+  const parsed = path.posix.parse(normalizeRelativePath(relativePath));
   const stamp = date.toISOString().replace(/[-:]/g, '').replace(/\..+$/, 'Z');
   return path.posix.join(parsed.dir, `${parsed.name}.conflict-${side}-${stamp}${parsed.ext}`);
 }

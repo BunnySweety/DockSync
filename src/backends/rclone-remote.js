@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { normalizeRelativePath } from '../local-files.js';
 
 function rcloneHash(item) {
   const hashes = item.Hashes || item.hashes || {};
@@ -51,7 +52,7 @@ export class RcloneRemoteBackend {
     const items = output.trim() ? JSON.parse(output) : [];
     const files = {};
     for (const item of items) {
-      const relativePath = item.Path.split(path.sep).join(path.posix.sep);
+      const relativePath = normalizeRelativePath(item.Path);
       files[relativePath] = {
         path: relativePath,
         size: item.Size || 0,
@@ -83,7 +84,7 @@ export class RcloneRemoteBackend {
 
   remoteTarget(relativePath = '') {
     const basePath = this.config.remotePath.replace(/^\/+/, '').replace(/\/+$/, '');
-    const cleanRelativePath = relativePath.replace(/^\/+/, '');
+    const cleanRelativePath = relativePath ? normalizeRelativePath(relativePath) : '';
     const joined = [basePath, cleanRelativePath].filter(Boolean).join('/');
     if (!joined) {
       return this.prefix;

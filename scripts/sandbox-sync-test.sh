@@ -126,4 +126,78 @@ printf 'remote edit\n' > "$TMP_DIR/remote/shared.txt"
 run_sync
 
 find "$TMP_DIR/local" "$TMP_DIR/remote" -name 'shared.conflict-*' | grep -q .
+
+node --input-type=module - "$ROOT" "$TMP_DIR" <<'NODE'
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const root = process.argv[2];
+const tmpDir = process.argv[3];
+const { normalizeRelativePath, resolveInsideRoot } = await import(pathToFileURL(path.join(root, 'src/local-files.js')).href);
+const { SyncEngine } = await import(pathToFileURL(path.join(root, 'src/sync-engine.js')).href);
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+for (const unsafePath of ['../escape.txt', '/escape.txt', 'nested/../../escape.txt', 'nested\\..\\..\\escape.txt']) {
+  try {
+    normalizeRelativePath(unsafePath);
+    throw new Error(`accepted unsafe path ${unsafePath}`);
+  } catch (error) {
+    assert(error.message.includes('Unsafe relative path'), `unexpected error for ${unsafePath}: ${error.message}`);
+  }
+}
+
+const guardedRoot = path.join(tmpDir, 'guard-local');
+const guardedState = path.join(tmpDir, 'guard-state');
+await fs.mkdir(guardedRoot, { recursive: true });
+await fs.mkdir(guardedState, { recursive: true });
+const safePath = resolveInsideRoot(guardedRoot, 'nested/file.txt');
+assert(safePath === path.join(guardedRoot, 'nested', 'file.txt'), 'safe relative path resolves inside root');
+
+const logger = { info() {}, error() {} };
+const remote = {
+  async listFiles() {
+    return {
+      '../escape.txt': {
+        path: '../escape.txt',
+        size: 7,
+        mtimeMs: Date.now(),
+        hash: 'malicious',
+      },
+    };
+  },
+  async readFile(_relativePath, destination) {
+    await fs.writeFile(destination, 'escape\n');
+  },
+  async writeFile() {},
+  async deleteFile() {},
+};
+const engine = new SyncEngine({
+  localPath: guardedRoot,
+  stateDir: guardedState,
+  stateFile: path.join(guardedState, 'sync-state.json'),
+  conflictStrategy: 'newer-wins',
+  bandwidthLimitBps: 0,
+}, logger, remote);
+
+let rejected = false;
+try {
+  await engine.syncOnce('path-guard');
+} catch (error) {
+  rejected = error.message.includes('Unsafe relative path');
+}
+assert(rejected, 'sync rejects remote paths that escape the local root');
+
+try {
+  await fs.access(path.join(tmpDir, 'escape.txt'));
+  throw new Error('escape file was written outside the local root');
+} catch (error) {
+  assert(error.code === 'ENOENT', error.message);
+}
+NODE
 echo "sandbox sync test passed"

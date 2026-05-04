@@ -7,6 +7,7 @@ import {
   fileSignature,
   listLocalFiles,
   readJsonFile,
+  resolveInsideRoot,
   writeJsonAtomic,
 } from './local-files.js';
 
@@ -121,7 +122,7 @@ export class SyncEngine {
     } else if (action.type === 'download') {
       await this.downloadToLocal(action.path, remote);
     } else if (action.type === 'delete-local') {
-      await fs.promises.rm(path.join(this.config.localPath, action.path), { force: true });
+      await fs.promises.rm(resolveInsideRoot(this.config.localPath, action.path), { force: true });
     } else if (action.type === 'delete-remote') {
       await this.remote.deleteFile(action.path);
     } else if (action.type === 'conflict-local-wins') {
@@ -134,7 +135,7 @@ export class SyncEngine {
   }
 
   async downloadToLocal(relativePath, remoteMetadata) {
-    const destination = path.join(this.config.localPath, relativePath);
+    const destination = resolveInsideRoot(this.config.localPath, relativePath);
     await ensureParentDirectory(destination);
     const tempPath = `${destination}.docksync.tmp-${process.pid}`;
     await this.remote.readFile(relativePath, tempPath);
@@ -146,8 +147,8 @@ export class SyncEngine {
   }
 
   async preserveLocalConflict(relativePath) {
-    const source = path.join(this.config.localPath, relativePath);
-    const destination = path.join(this.config.localPath, conflictPath(relativePath, 'local'));
+    const source = resolveInsideRoot(this.config.localPath, relativePath);
+    const destination = resolveInsideRoot(this.config.localPath, conflictPath(relativePath, 'local'));
     await copyFileWithLimit(source, destination, this.config.bandwidthLimitBps);
   }
 
