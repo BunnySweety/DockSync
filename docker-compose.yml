@@ -1,0 +1,28 @@
+services:
+  docksync:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-10001}
+        APP_GID: ${APP_GID:-10001}
+    image: docksync:local
+    read_only: true
+    user: "${APP_UID:-10001}:${APP_GID:-10001}"
+    restart: unless-stopped
+    env_file:
+      - ./config/docksync.env.example
+    environment:
+      SYNC_LOCAL_PATH: /data
+      STATE_DIR: /state
+    volumes:
+      - ./data:/data
+      - ./state:/state
+      - ./rclone:/config/rclone:ro
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=64m
+    ports:
+      - "8080:8080"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

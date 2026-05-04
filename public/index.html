@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DockSync Console</title>
+    <link rel="stylesheet" href="/variables.css">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#status" aria-label="DockSync status">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 8.5 12 4l7 4.5v7L12 20l-7-4.5v-7Z"/><path d="M12 4v16M5 8.5l7 4.2 7-4.2"/></svg>
+          </span>
+          <span>DockSync</span>
+        </a>
+        <nav class="nav-list">
+          <a class="nav-item is-active" href="#status">
+            <svg viewBox="0 0 24 24"><path d="M4 13h5l2-7 4 12 2-5h3"/></svg>
+            <span>Status</span>
+          </a>
+          <a class="nav-item" href="#activity">
+            <svg viewBox="0 0 24 24"><path d="M7 7h10M7 12h10M7 17h6"/></svg>
+            <span>Activity</span>
+          </a>
+          <a class="nav-item" href="#settings">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><path d="M8 5v4M16 15v4"/></svg>
+            <span>Settings</span>
+          </a>
+        </nav>
+      </aside>
+
+      <div class="content">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Operations console</p>
+            <h1>Synchronization status</h1>
+          </div>
+          <div class="topbar-actions">
+            <span id="topStatus" class="runtime-pill">Checking</span>
+            <button id="refreshButton" class="icon-button" type="button" aria-label="Refresh status">
+              <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v6h-6"/></svg>
+            </button>
+            <button id="syncButton" class="primary-button" type="button" aria-label="Sync now">
+              <svg viewBox="0 0 24 24"><path d="M17 3v5h-5"/><path d="M7 21v-5h5"/><path d="M17 8a7 7 0 0 0-11.8 3"/><path d="M7 16a7 7 0 0 0 11.8-3"/></svg>
+              <span>Sync now</span>
+            </button>
+          </div>
+        </header>
+
+        <main>
+          <section id="status" class="status-band" aria-label="Current sync status">
+            <div class="status-cell">
+              <span class="label">Health</span>
+              <strong id="healthValue">Checking</strong>
+            </div>
+            <div class="status-cell">
+              <span class="label">Backend</span>
+              <strong id="backendValue">rclone</strong>
+            </div>
+            <div class="status-cell path-cell">
+              <span class="label">Local path</span>
+              <strong id="localPathValue">/data</strong>
+            </div>
+            <div class="status-cell path-cell">
+              <span class="label">Remote path</span>
+              <strong id="remotePathValue">/DockSync</strong>
+            </div>
+            <div class="status-cell">
+              <span class="label">Next sync</span>
+              <strong id="nextSyncValue">Waiting</strong>
+            </div>
+          </section>
+
+          <div class="workspace-grid">
+            <section id="activity" class="panel activity-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>Activity</h2>
+                  <p id="activitySummary">No completed run yet.</p>
+                </div>
+                <div class="segmented-control" aria-label="Activity filter">
+                  <button class="is-selected" type="button" data-filter="all">All</button>
+                  <button type="button" data-filter="upload">Uploads</button>
+                  <button type="button" data-filter="download">Downloads</button>
+                  <button type="button" data-filter="conflict">Conflicts</button>
+                </div>
+              </div>
+              <div class="activity-table" role="table" aria-label="Recent sync activity">
+                <div class="table-row table-head" role="row">
+                  <span role="columnheader">Action</span>
+                  <span role="columnheader">Path</span>
+                  <span role="columnheader">Run</span>
+                  <span role="columnheader">Time</span>
+                </div>
+                <div id="activityRows"></div>
+              </div>
+            </section>
+
+            <aside id="settings" class="panel config-panel">
+              <div class="panel-header compact">
+                <div>
+                  <h2>Configuration</h2>
+                  <p>Runtime values exposed by the service.</p>
+                </div>
+              </div>
+              <dl class="config-list">
+                <div><dt>Rclone remote</dt><dd id="rcloneRemoteValue">proton:</dd></div>
+                <div><dt>Interval</dt><dd id="intervalValue">300s</dd></div>
+                <div><dt>Conflict strategy</dt><dd id="conflictValue">newer-wins</dd></div>
+                <div><dt>Bandwidth limit</dt><dd id="bandwidthValue">Unlimited</dd></div>
+                <div><dt>Manual API</dt><dd id="manualApiValue">Enabled</dd></div>
+                <div><dt>Error webhook</dt><dd id="webhookValue">Not configured</dd></div>
+                <div><dt>Serial transfers</dt><dd id="serialValue">Off</dd></div>
+              </dl>
+            </aside>
+          </div>
+
+          <section class="footer-strip" aria-label="Last synchronization result">
+            <div>
+              <span class="label">Last run</span>
+              <strong id="lastRunValue">No completed run</strong>
+            </div>
+            <div>
+              <span class="label">Actions</span>
+              <strong id="actionCountValue">0</strong>
+            </div>
+            <div>
+              <span class="label">Runtime</span>
+              <strong id="durationValue">Waiting</strong>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <a href="#status">Status</a>
+      <a href="#activity">Activity</a>
+      <a href="#settings">Config</a>
+    </nav>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

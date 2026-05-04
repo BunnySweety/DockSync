@@ -1,0 +1,17 @@
+{
+  "name": "docksync",
+  "version": "0.1.0",
+  "description": "Rootless distroless container service for synchronizing a local path with Proton Drive.",
+  "type": "module",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "sync:once": "SYNC_ONCE=true node src/index.js",
+    "test": "bash scripts/frontend-theme-test.sh && bash scripts/sandbox-sync-test.sh && bash scripts/frontend-e2e-test.sh",
+    "release:check": "bash scripts/release-check.sh"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
