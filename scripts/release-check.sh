@@ -61,6 +61,8 @@ mkdir -p "$TEST_ROOT/local" "$TEST_ROOT/state/rclone-remote/DockSync" "$TEST_ROO
 printf 'release local\n' > "$TEST_ROOT/local/release-local.txt"
 printf 'release remote\n' > "$TEST_ROOT/state/rclone-remote/DockSync/release-remote.txt"
 : > "$TEST_ROOT/rclone/rclone.conf"
+chmod -R ugo+rwX "$TEST_ROOT/local" "$TEST_ROOT/state"
+chmod -R ugo+rX "$TEST_ROOT/rclone"
 
 "$DOCKER" build -t "$IMAGE" "$(docker_path "$ROOT")"
 "$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1 || true
