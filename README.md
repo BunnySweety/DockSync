@@ -4,6 +4,17 @@
 
 DockSync is a rootless container service that synchronizes a mounted local path with Proton Drive. It delegates Proton authentication and file transfer to an existing Rclone remote.
 
+## Quick Start
+
+```bash
+npm ci
+npm run onboard
+npm run check
+npm test
+```
+
+`npm run onboard` creates ignored runtime directories and runs a deployment preflight. See `DEPLOYMENT.md` for the full host setup, Proton Drive Rclone configuration, hardened Docker run command, and rollback notes.
+
 ## Features
 
 - Bidirectional incremental sync using a persisted state file in `/state`.
@@ -50,6 +61,7 @@ If the Rclone config is encrypted, create `secrets/rclone_config_pass` and set `
 
 ```bash
 npm install
+npm run doctor
 npm start
 ```
 
@@ -120,6 +132,10 @@ npm run release:check
 ```
 
 This builds the Docker image, runs it with a read-only root filesystem, rootless user, dropped capabilities, and a local Rclone remote, then verifies the web console assets, status APIs, health check, manual sync, and file transfer results.
+
+## Deployment
+
+Use `DEPLOYMENT.md` for a step-by-step deployment checklist. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with `docker compose up --build -d`.
 
 ## Security Notes
 

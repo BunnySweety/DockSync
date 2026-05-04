@@ -7,6 +7,7 @@
   "main": "src/index.js",
   "files": [
     "config/docksync.env.example",
+    "DEPLOYMENT.md",
     "docker-compose.yml",
     "Dockerfile",
     "README.md",
@@ -20,6 +21,8 @@
   ],
   "scripts": {
     "check": "bash scripts/check-js.sh",
+    "doctor": "bash scripts/doctor.sh",
+    "onboard": "bash scripts/doctor.sh --init",
     "start": "node src/index.js",
     "sync:once": "SYNC_ONCE=true node src/index.js",
     "test": "bash scripts/frontend-theme-test.sh && bash scripts/sandbox-sync-test.sh && bash scripts/frontend-e2e-test.sh",
