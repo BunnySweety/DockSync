@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm-slim AS deps
+FROM node:25-bookworm-slim AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev && mkdir -p node_modules
 
 FROM rclone/rclone:latest AS rclone-bin
 
-FROM node:22-bookworm-slim AS app-files
+FROM node:25-bookworm-slim AS app-files
 ARG APP_UID=10001
 ARG APP_GID=10001
 WORKDIR /app
