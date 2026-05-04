@@ -208,6 +208,7 @@ h3 {
 
 .icon-button,
 .primary-button,
+.secondary-button,
 .segmented-control button {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-buttons);
@@ -236,19 +237,33 @@ h3 {
   font-weight: var(--font-weight-bold);
 }
 
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-height: 36px;
+  padding: var(--spacing-4) var(--spacing-12);
+  color: var(--accent);
+  font-size: var(--text-body-sm);
+  font-weight: var(--font-weight-bold);
+}
+
 .primary-button:disabled,
-.icon-button:disabled {
+.icon-button:disabled,
+.secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
 
 .primary-button:not(:disabled):hover,
-.icon-button:not(:disabled):hover {
+.icon-button:not(:disabled):hover,
+.secondary-button:not(:disabled):hover {
   transform: translateY(-1px);
 }
 
 .primary-button:focus-visible,
 .icon-button:focus-visible,
+.secondary-button:focus-visible,
 .segmented-control button:focus-visible {
   box-shadow: var(--shadow-subtle);
   outline: none;
@@ -341,6 +356,90 @@ h3 {
   margin-top: var(--spacing-20);
 }
 
+.setup-assistant {
+  margin: var(--card-padding);
+  padding: var(--card-padding);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--surface) 70%, var(--bg));
+}
+
+.assistant-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+  margin-bottom: var(--spacing-12);
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+#assistantState {
+  padding: var(--spacing-4) var(--spacing-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-buttons);
+  background: var(--bg);
+  color: var(--muted);
+  text-transform: none;
+}
+
+#assistantState.ready {
+  border-color: color-mix(in srgb, var(--ok) 32%, var(--border));
+  color: var(--ok);
+}
+
+#assistantState.action {
+  border-color: color-mix(in srgb, var(--warn) 32%, var(--border));
+  color: var(--warn);
+}
+
+#assistantTitle {
+  margin-bottom: var(--spacing-8);
+}
+
+#assistantDetail,
+.assistant-security {
+  color: var(--color-iron-gray);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+}
+
+.assistant-command {
+  margin-top: var(--spacing-16);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.assistant-command pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: var(--spacing-12);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body);
+}
+
+.assistant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-12);
+  margin-top: var(--spacing-16);
+}
+
+.assistant-actions [hidden],
+.assistant-command[hidden] {
+  display: none;
+}
+
+.assistant-security {
+  margin-top: var(--spacing-12);
+}
+
 .setup-progress {
   display: inline-flex;
   align-items: center;
@@ -417,7 +516,8 @@ h3 {
 }
 
 .command-list {
-  padding: var(--card-padding);
+  margin: 0;
+  padding: 0 var(--card-padding) var(--card-padding);
 }
 
 .command-list-header {
@@ -425,7 +525,19 @@ h3 {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--spacing-16);
+  padding: var(--spacing-12) 0;
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+}
+
+.command-list-header::-webkit-details-marker {
+  display: none;
+}
+
+.command-list[open] .command-list-header {
   margin-bottom: var(--spacing-12);
+  border-bottom: 1px solid var(--border);
 }
 
 .command-list-header p {
@@ -725,6 +837,11 @@ h3 {
     padding: 0;
   }
 
+  .secondary-button {
+    justify-content: center;
+    width: 100%;
+  }
+
   .primary-button span {
     position: static;
     width: auto;
@@ -762,6 +879,16 @@ h3 {
 
   .setup-progress {
     justify-content: center;
+  }
+
+  .setup-assistant {
+    margin: var(--spacing-16);
+  }
+
+  .assistant-meta,
+  .assistant-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .check-row {

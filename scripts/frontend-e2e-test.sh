@@ -213,11 +213,14 @@ async function waitFor(predicate, label) {
   assert(indexHtml.includes('id="syncButton"'), 'frontend exposes sync button');
   assert(indexHtml.includes('id="activityRows"'), 'frontend exposes activity list');
   assert(indexHtml.includes('id="onboardingChecks"'), 'frontend exposes onboarding checklist');
+  assert(indexHtml.includes('id="setupAssistant"'), 'frontend exposes setup assistant');
+  assert(indexHtml.includes('id="assistantSyncButton"'), 'frontend exposes assistant sync action');
 
   const styles = await getText('/styles.css');
   assert(styles.includes('var(--font-protonserif)'), 'frontend styles consume heading font token');
   assert(styles.includes('var(--radius-cards)'), 'frontend styles consume card radius token');
   assert(styles.includes('.onboarding-panel'), 'frontend styles onboarding panel');
+  assert(styles.includes('.setup-assistant'), 'frontend styles setup assistant');
 
   const variables = await getText('/variables.css');
   assert(variables.includes('--color-action-violet'), 'variables.css is served');

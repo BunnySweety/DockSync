@@ -107,7 +107,7 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
 ```
 
-Open `http://localhost:8080/` to follow the onboarding checklist, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. If `rclone/rclone.conf` is not mounted yet, the console stays available and marks Rclone setup as required.
+Open `http://localhost:8080/` to follow the first-connection installation assistant, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. If `rclone/rclone.conf` is not mounted yet, the console stays available and marks Rclone setup as required.
 
 ## Configuration
 

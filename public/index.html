@@ -81,19 +81,43 @@
           <section id="onboarding" class="panel onboarding-panel" aria-label="Onboarding checklist">
             <div class="panel-header">
               <div>
-                <h2>Onboarding</h2>
+                <h2>Installation assistant</h2>
                 <p id="onboardingSummary">Checking setup inputs.</p>
               </div>
               <span id="onboardingProgress" class="setup-progress">Checking</span>
             </div>
-            <div id="onboardingChecks" class="onboarding-checks"></div>
-            <div class="command-list" aria-label="Setup commands">
-              <div class="command-list-header">
-                <h3>Setup commands</h3>
-                <p>Run these on the host that owns the checkout.</p>
+            <div id="setupAssistant" class="setup-assistant" aria-live="polite">
+              <div class="assistant-meta">
+                <span id="assistantStep">Step</span>
+                <span id="assistantState">Checking</span>
               </div>
-              <div id="onboardingCommands"></div>
+              <h3 id="assistantTitle">Checking setup</h3>
+              <p id="assistantDetail">DockSync is reading the current runtime setup.</p>
+              <div id="assistantCommand" class="assistant-command"></div>
+              <div class="assistant-actions">
+                <button id="assistantCopyButton" class="secondary-button" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="10" height="10" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copy command</span>
+                </button>
+                <button id="assistantSyncButton" class="primary-button" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3v5h-5"/><path d="M7 21v-5h5"/><path d="M17 8a7 7 0 0 0-11.8 3"/><path d="M7 16a7 7 0 0 0 11.8-3"/></svg>
+                  <span>Start sync</span>
+                </button>
+                <button id="assistantRefreshButton" class="secondary-button" type="button">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v6h-6"/></svg>
+                  <span>Refresh</span>
+                </button>
+              </div>
+              <p class="assistant-security">Secrets are never shown here. Proton authentication stays in Rclone.</p>
             </div>
+            <div id="onboardingChecks" class="onboarding-checks"></div>
+            <details class="command-list" aria-label="Setup commands">
+              <summary class="command-list-header">
+                <h3>Setup commands</h3>
+                <p>Reference for host-side setup.</p>
+              </summary>
+              <div id="onboardingCommands"></div>
+            </details>
           </section>
 
           <div class="workspace-grid">

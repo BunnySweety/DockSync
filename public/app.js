@@ -2,6 +2,14 @@ const elements = {
   actionCount: document.querySelector('#actionCountValue'),
   activityRows: document.querySelector('#activityRows'),
   activitySummary: document.querySelector('#activitySummary'),
+  assistantCommand: document.querySelector('#assistantCommand'),
+  assistantCopyButton: document.querySelector('#assistantCopyButton'),
+  assistantDetail: document.querySelector('#assistantDetail'),
+  assistantRefreshButton: document.querySelector('#assistantRefreshButton'),
+  assistantState: document.querySelector('#assistantState'),
+  assistantStep: document.querySelector('#assistantStep'),
+  assistantSyncButton: document.querySelector('#assistantSyncButton'),
+  assistantTitle: document.querySelector('#assistantTitle'),
   backend: document.querySelector('#backendValue'),
   bandwidth: document.querySelector('#bandwidthValue'),
   conflict: document.querySelector('#conflictValue'),
@@ -26,8 +34,41 @@ const elements = {
   webhook: document.querySelector('#webhookValue'),
 };
 
+const ONBOARDING_STEPS = [
+  {
+    id: 'workspace',
+    title: 'Prepare the host workspace',
+    detail: 'Create the local mounts and placeholders used by the container.',
+    checkIds: ['runtime-mounts'],
+    commandId: 'host-preflight',
+  },
+  {
+    id: 'proton',
+    title: 'Connect Proton Drive',
+    detail: 'Authenticate with Rclone on the host, then mount the generated config.',
+    checkIds: ['rclone-config'],
+    commandId: 'proton-rclone',
+  },
+  {
+    id: 'verify',
+    title: 'Verify backend initialization',
+    detail: 'Once the Rclone config is mounted, start a sync from the console.',
+    checkIds: ['backend-init', 'manual-sync'],
+    action: 'sync',
+  },
+  {
+    id: 'secrets',
+    title: 'Review optional secrets',
+    detail: 'Only fill these files when using an encrypted Rclone config or webhook notifications.',
+    checkIds: ['encrypted-config', 'webhook-secret'],
+    commandId: 'optional-secrets',
+    optional: true,
+  },
+];
+
 const state = {
   activity: loadActivity(),
+  assistantStepId: null,
   filter: 'all',
   health: null,
   onboarding: null,
@@ -44,6 +85,16 @@ function loadActivity() {
 
 function saveActivity() {
   localStorage.setItem('docksync.activity', JSON.stringify(state.activity.slice(0, 80)));
+}
+
+function focusOnboardingIfNeeded(onboarding) {
+  if (onboarding?.ok || sessionStorage.getItem('docksync.onboarding.focused') === 'true') {
+    return;
+  }
+  sessionStorage.setItem('docksync.onboarding.focused', 'true');
+  if (!window.location.hash || window.location.hash === '#status') {
+    window.location.hash = 'onboarding';
+  }
 }
 
 async function requestJson(url, options) {
@@ -128,9 +179,36 @@ function labelAction(type) {
 }
 
 function labelCheckStatus(status) {
+  if (status === 'pending') return 'Pending';
   if (status === 'ready') return 'Ready';
   if (status === 'optional') return 'Optional';
   return 'Action needed';
+}
+
+function checkById(onboarding, id) {
+  return onboarding?.checks?.find((check) => check.id === id);
+}
+
+function commandById(onboarding, id) {
+  return onboarding?.commands?.find((command) => command.id === id);
+}
+
+function stepStatus(step, onboarding) {
+  const statuses = step.checkIds.map((id) => checkById(onboarding, id)?.status || 'pending');
+  if (statuses.some((status) => status === 'action')) return 'action';
+  if (statuses.every((status) => status === 'ready')) return 'ready';
+  if (step.optional) return 'optional';
+  return 'pending';
+}
+
+function nextAssistantStep(onboarding) {
+  if (!onboarding) return ONBOARDING_STEPS[0];
+  const requiredStep = ONBOARDING_STEPS
+    .filter((step) => !step.optional)
+    .find((step) => stepStatus(step, onboarding) !== 'ready');
+  if (requiredStep) return requiredStep;
+  return ONBOARDING_STEPS.find((step) => step.optional && stepStatus(step, onboarding) !== 'ready')
+    || ONBOARDING_STEPS[ONBOARDING_STEPS.length - 1];
 }
 
 function mergeActivity(lastSync) {
@@ -210,6 +288,8 @@ function renderOnboarding() {
     return;
   }
 
+  renderAssistant(onboarding);
+
   const checks = onboarding.checks || [];
   const requiredChecks = checks.filter((check) => check.status !== 'optional');
   const readyRequired = requiredChecks.filter((check) => check.status === 'ready').length;
@@ -241,6 +321,31 @@ function renderOnboarding() {
       <pre><code>${escapeHtml(item.command)}</code></pre>
     </section>
   `).join('');
+}
+
+function renderAssistant(onboarding) {
+  const step = ONBOARDING_STEPS.find((item) => item.id === state.assistantStepId) || nextAssistantStep(onboarding);
+  state.assistantStepId = step.id;
+  const status = stepStatus(step, onboarding);
+  const stepIndex = ONBOARDING_STEPS.findIndex((item) => item.id === step.id) + 1;
+  const command = step.commandId ? commandById(onboarding, step.commandId)?.command : null;
+  const commandNeeded = Boolean(command && status !== 'ready');
+  const syncAllowed = step.action === 'sync' && status !== 'ready' && state.status?.config?.manualSyncEnabled !== false;
+
+  elements.assistantStep.textContent = `Step ${stepIndex} of ${ONBOARDING_STEPS.length}`;
+  elements.assistantState.textContent = labelCheckStatus(status);
+  elements.assistantState.className = status;
+  elements.assistantTitle.textContent = onboarding.ok && !step.optional ? 'Setup complete' : step.title;
+  elements.assistantDetail.textContent = onboarding.ok && !step.optional
+    ? 'DockSync is ready to sync with the configured backend.'
+    : step.detail;
+  elements.assistantCommand.innerHTML = commandNeeded
+    ? `<pre><code>${escapeHtml(command)}</code></pre>`
+    : '';
+  elements.assistantCommand.hidden = !commandNeeded;
+  elements.assistantCopyButton.hidden = !commandNeeded;
+  elements.assistantCopyButton.dataset.commandId = commandNeeded ? step.commandId : '';
+  elements.assistantSyncButton.hidden = !syncAllowed;
 }
 
 function renderActivity() {
@@ -292,6 +397,7 @@ async function refreshStatus({ silent = false } = {}) {
     state.status = status;
     state.health = health;
     state.onboarding = onboarding;
+    focusOnboardingIfNeeded(onboarding);
     mergeSyncHistory(status);
     render();
     if (!silent) showToast('Status refreshed');
@@ -328,6 +434,18 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
 
 elements.refreshButton.addEventListener('click', () => refreshStatus());
 elements.syncButton.addEventListener('click', triggerSync);
+elements.assistantRefreshButton.addEventListener('click', () => refreshStatus());
+elements.assistantSyncButton.addEventListener('click', triggerSync);
+elements.assistantCopyButton.addEventListener('click', async () => {
+  const command = commandById(state.onboarding, elements.assistantCopyButton.dataset.commandId)?.command;
+  if (!command) return;
+  try {
+    await navigator.clipboard.writeText(command);
+    showToast('Command copied');
+  } catch {
+    showToast('Clipboard is unavailable');
+  }
+});
 elements.onboardingCommands.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-command-id]');
   if (!button) return;
