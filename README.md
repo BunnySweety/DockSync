@@ -1,5 +1,7 @@
 # DockSync
 
+[![CI](https://github.com/BunnySweety/DockSync/actions/workflows/ci.yml/badge.svg)](https://github.com/BunnySweety/DockSync/actions/workflows/ci.yml)
+
 DockSync is a rootless container service that synchronizes a mounted local path with Proton Drive. It delegates Proton authentication and file transfer to an existing Rclone remote.
 
 ## Features

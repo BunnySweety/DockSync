@@ -5,6 +5,19 @@
   "type": "module",
   "private": true,
   "main": "src/index.js",
+  "files": [
+    "config/docksync.env.example",
+    "docker-compose.yml",
+    "Dockerfile",
+    "README.md",
+    "DESIGN.md",
+    "public/",
+    "scripts/",
+    "src/",
+    "theme.css",
+    "tokens.json",
+    "variables.css"
+  ],
   "scripts": {
     "check": "bash scripts/check-js.sh",
     "start": "node src/index.js",
