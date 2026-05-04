@@ -430,10 +430,46 @@ h3 {
   font-weight: var(--font-weight-bold);
 }
 
+.assistant-mode {
+  display: inline-flex;
+  width: fit-content;
+  padding: var(--spacing-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-buttons);
+  background: var(--surface);
+}
+
+.assistant-mode button {
+  min-height: 28px;
+  padding: 0 var(--spacing-12);
+  border: 0;
+  border-radius: var(--radius-buttons);
+  background: transparent;
+  color: var(--color-iron-gray);
+  cursor: pointer;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.assistant-mode button.is-selected {
+  background: var(--bg);
+  color: var(--accent-strong);
+  box-shadow: var(--shadow-subtle);
+}
+
+.assistant-fieldset {
+  display: grid;
+  gap: var(--spacing-10);
+}
+
+.assistant-fieldset[hidden] {
+  display: none;
+}
+
+.assistant-form input[type="text"],
+.assistant-form input[type="password"],
 .assistant-form textarea {
   width: 100%;
-  min-height: 190px;
-  resize: vertical;
   padding: var(--spacing-12);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -442,6 +478,11 @@ h3 {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: var(--text-body-sm);
   line-height: var(--leading-body);
+}
+
+.assistant-form textarea {
+  min-height: 190px;
+  resize: vertical;
 }
 
 .assistant-form input[type="file"] {
@@ -454,6 +495,8 @@ h3 {
   font-size: var(--text-body-sm);
 }
 
+.assistant-form input[type="text"]:focus,
+.assistant-form input[type="password"]:focus,
 .assistant-form textarea:focus {
   box-shadow: var(--shadow-subtle);
   outline: none;

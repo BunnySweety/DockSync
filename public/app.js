@@ -7,6 +7,7 @@ const elements = {
   assistantDetail: document.querySelector('#assistantDetail'),
   assistantRefreshButton: document.querySelector('#assistantRefreshButton'),
   assistantRcloneForm: document.querySelector('#assistantRcloneForm'),
+  assistantRcloneSubmitLabel: document.querySelector('#assistantRcloneSubmitLabel'),
   assistantState: document.querySelector('#assistantState'),
   assistantStep: document.querySelector('#assistantStep'),
   assistantSyncButton: document.querySelector('#assistantSyncButton'),
@@ -28,8 +29,14 @@ const elements = {
   refreshButton: document.querySelector('#refreshButton'),
   rcloneConfigFile: document.querySelector('#rcloneConfigFile'),
   rcloneConfigInput: document.querySelector('#rcloneConfigInput'),
+  rcloneImportFields: document.querySelector('#rcloneImportFields'),
   rcloneRemote: document.querySelector('#rcloneRemoteValue'),
   remotePath: document.querySelector('#remotePathValue'),
+  protonGuidedFields: document.querySelector('#protonGuidedFields'),
+  protonMailboxPassword: document.querySelector('#protonMailboxPassword'),
+  protonPassword: document.querySelector('#protonPassword'),
+  protonTwoFactor: document.querySelector('#protonTwoFactor'),
+  protonUsername: document.querySelector('#protonUsername'),
   serial: document.querySelector('#serialValue'),
   syncButton: document.querySelector('#syncButton'),
   toast: document.querySelector('#toast'),
@@ -76,6 +83,7 @@ const state = {
   filter: 'all',
   health: null,
   onboarding: null,
+  setupMode: 'guided',
   status: null,
 };
 
@@ -363,6 +371,11 @@ function renderAssistant(onboarding) {
     : '';
   elements.assistantCommand.hidden = !commandNeeded;
   elements.assistantRcloneForm.hidden = !showRcloneForm;
+  elements.protonGuidedFields.hidden = state.setupMode !== 'guided';
+  elements.rcloneImportFields.hidden = state.setupMode !== 'import';
+  elements.assistantRcloneSubmitLabel.textContent = state.setupMode === 'guided'
+    ? 'Create config'
+    : 'Save config';
   elements.assistantCopyButton.hidden = !commandNeeded;
   elements.assistantCopyButton.dataset.commandId = commandNeeded ? step.commandId : '';
   elements.assistantSyncButton.hidden = !syncAllowed;
@@ -444,23 +457,28 @@ async function triggerSync() {
 
 async function saveRcloneConfig(event) {
   event.preventDefault();
-  const content = elements.rcloneConfigInput.value.trim();
-  if (!content) {
-    showToast('Rclone config is required');
-    return;
-  }
   const submitButton = elements.assistantRcloneForm.querySelector('button[type="submit"]');
   submitButton.disabled = true;
   try {
-    const result = await requestJson('/setup/rclone-config', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-docksync-setup': '1',
-      },
-      body: JSON.stringify({ content }),
-    });
+    const result = state.setupMode === 'guided'
+      ? await requestJson('/setup/protondrive', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-docksync-setup': '1',
+        },
+        body: JSON.stringify({
+          username: elements.protonUsername.value,
+          password: elements.protonPassword.value,
+          twoFactorCode: elements.protonTwoFactor.value,
+          mailboxPassword: elements.protonMailboxPassword.value,
+        }),
+      })
+      : await saveImportedRcloneConfig();
     elements.rcloneConfigInput.value = '';
+    elements.protonPassword.value = '';
+    elements.protonTwoFactor.value = '';
+    elements.protonMailboxPassword.value = '';
     state.onboarding = result.onboarding || state.onboarding;
     state.assistantStepId = null;
     render();
@@ -471,6 +489,21 @@ async function saveRcloneConfig(event) {
   } finally {
     submitButton.disabled = false;
   }
+}
+
+async function saveImportedRcloneConfig() {
+  const content = elements.rcloneConfigInput.value.trim();
+  if (!content) {
+    throw new Error('Rclone config is required');
+  }
+  return requestJson('/setup/rclone-config', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-docksync-setup': '1',
+    },
+    body: JSON.stringify({ content }),
+  });
 }
 
 async function loadRcloneConfigFile() {
@@ -484,6 +517,16 @@ async function loadRcloneConfigFile() {
   elements.rcloneConfigInput.value = await file.text();
 }
 
+function setSetupMode(mode) {
+  state.setupMode = mode;
+  document.querySelectorAll('[data-setup-mode]').forEach((button) => {
+    button.classList.toggle('is-selected', button.dataset.setupMode === mode);
+  });
+  elements.protonGuidedFields.hidden = mode !== 'guided';
+  elements.rcloneImportFields.hidden = mode !== 'import';
+  elements.assistantRcloneSubmitLabel.textContent = mode === 'guided' ? 'Create config' : 'Save config';
+}
+
 document.querySelectorAll('[data-filter]').forEach((button) => {
   button.addEventListener('click', () => {
     state.filter = button.dataset.filter;
@@ -492,6 +535,10 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
     });
     renderActivity();
   });
+});
+
+document.querySelectorAll('[data-setup-mode]').forEach((button) => {
+  button.addEventListener('click', () => setSetupMode(button.dataset.setupMode));
 });
 
 elements.refreshButton.addEventListener('click', () => refreshStatus());

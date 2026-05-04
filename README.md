@@ -9,11 +9,10 @@ DockSync is a rootless container service that synchronizes a mounted local path 
 ```bash
 npm ci
 npm run onboard
-npm run check
-npm test
+docker compose up --build
 ```
 
-`npm run onboard` creates ignored runtime directories and runs a deployment preflight. See `DEPLOYMENT.md` for the full host setup, Proton Drive Rclone configuration, hardened Docker run command, and rollback notes.
+Open `http://127.0.0.1:8080/` and follow the first-connection assistant. It can generate `rclone/rclone.conf` from Proton account details or import an existing Rclone config, so the normal Compose path does not require running `rclone config` on the host.
 
 ## Features
 
@@ -27,7 +26,9 @@ npm test
 
 ## Proton Drive via Rclone
 
-Configure Proton Drive with Rclone on the host:
+Preferred path: start the Compose deployment and complete the guided setup in the web console. The assistant passes credentials only to the local container, stores generated passwords in Rclone's obscured config format, and writes `rclone/rclone.conf` through the writable `/config/rclone` mount.
+
+If you already manage Rclone on the host, you can still create the Proton Drive remote manually:
 
 ```bash
 rclone config
@@ -108,7 +109,7 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.secrets.yml up --build -d
 ```
 
-Open `http://localhost:8080/` to follow the first-connection installation assistant, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. The assistant can write `rclone/rclone.conf` when `/config/rclone` is writable. Compose publishes the console on `127.0.0.1` by default so setup stays local.
+Open `http://localhost:8080/` to follow the first-connection installation assistant, view status, inspect recent sync activity, and trigger a manual sync when `ENABLE_REST_API=true`. The assistant can generate `rclone/rclone.conf` from Proton account details or import an existing config when `/config/rclone` is writable. Compose publishes the console on `127.0.0.1` by default so setup stays local.
 
 ## Configuration
 
@@ -142,8 +143,8 @@ This builds the Docker image, runs it with a read-only root filesystem, rootless
 
 ## Deployment
 
-Use `DEPLOYMENT.md` for a step-by-step deployment checklist. The frontend also exposes the same host commands and readiness checks at `GET /onboarding`. At minimum, configure the Proton Drive remote with Rclone, keep `rclone/rclone.conf` and secrets outside Git, run `npm run release:check`, then deploy with Compose.
+Use `DEPLOYMENT.md` for a step-by-step deployment checklist. The frontend also exposes readiness checks at `GET /onboarding`. At minimum, run the preflight, deploy with Compose, complete Proton Drive setup in the first-connection assistant, and keep `rclone/rclone.conf` plus secrets outside Git.
 
 ## Security Notes
 
-Run with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, and writable mounts only for `/data`, `/state`, and `/config/rclone` during first-run setup. Keep the host port bound to `127.0.0.1` while `SETUP_API_ENABLED=true`, keep credentials outside the image, rotate session material regularly, and isolate the container network to the minimum egress required for Proton Drive.
+Run with `read_only: true`, `cap_drop: [ALL]`, `no-new-privileges:true`, and writable mounts only for `/data`, `/state`, and `/config/rclone` during first-run setup. Keep the host port bound to `127.0.0.1` while `SETUP_API_ENABLED=true`. UI-generated Rclone passwords are stored in Rclone's obscured format, not strong encryption; disable setup or make `/config/rclone` read-only after onboarding for stricter deployments.

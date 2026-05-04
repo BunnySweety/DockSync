@@ -217,6 +217,7 @@ async function waitFor(predicate, label) {
   assert(indexHtml.includes('id="assistantSyncButton"'), 'frontend exposes assistant sync action');
   assert(indexHtml.includes('id="rcloneConfigInput"'), 'frontend exposes rclone config input');
   assert(indexHtml.includes('id="rcloneConfigFile"'), 'frontend exposes rclone config file import');
+  assert(indexHtml.includes('id="protonUsername"'), 'frontend exposes guided Proton setup');
 
   const styles = await getText('/styles.css');
   assert(styles.includes('var(--font-protonserif)'), 'frontend styles consume heading font token');
@@ -224,6 +225,7 @@ async function waitFor(predicate, label) {
   assert(styles.includes('.onboarding-panel'), 'frontend styles onboarding panel');
   assert(styles.includes('.setup-assistant'), 'frontend styles setup assistant');
   assert(styles.includes('.assistant-form'), 'frontend styles assistant form');
+  assert(styles.includes('.assistant-mode'), 'frontend styles setup mode switcher');
 
   const variables = await getText('/variables.css');
   assert(variables.includes('--color-action-violet'), 'variables.css is served');
@@ -291,6 +293,14 @@ done
 
 cmd="${1:-}"
 case "$cmd" in
+  obscure)
+    if [ "${2:-}" = "-" ]; then
+      IFS= read -r secret
+      printf 'obscured-%s\n' "$secret"
+    else
+      printf 'obscured-%s\n' "${2:-}"
+    fi
+    ;;
   version)
     echo "rclone v-test"
     ;;
@@ -381,6 +391,28 @@ async function waitFor(predicate, label) {
   const saved = await saveResponse.json();
   assert(saved.ok === true, 'setup save succeeds');
   assert(saved.onboarding?.checks?.some((check) => check.id === 'rclone-config' && check.status === 'ready'), 'onboarding reports saved rclone config');
+
+  const injectedResponse = await fetch(`${baseUrl}/setup/protondrive`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-docksync-setup': '1',
+    },
+    body: JSON.stringify({ username: 'user@example.com\n[evil]', password: 'secret-password' }),
+  });
+  assert(injectedResponse.status === 400, 'guided setup rejects config injection characters');
+
+  const generatedResponse = await fetch(`${baseUrl}/setup/protondrive`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-docksync-setup': '1',
+    },
+    body: JSON.stringify({ username: 'user@example.com', password: 'secret-password', twoFactorCode: '123456' }),
+  });
+  assert(generatedResponse.ok, `guided setup returned ${generatedResponse.status}`);
+  const generated = await generatedResponse.json();
+  assert(generated.ok === true, 'guided setup succeeds');
 })().catch((error) => {
   console.error(error);
   process.exit(1);

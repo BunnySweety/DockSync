@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -70,8 +71,116 @@ function validateRcloneConfig(content, expectedRemoteName) {
   }
 }
 
+function sanitizeRemoteSectionName(name) {
+  const normalized = String(name || '').trim();
+  if (!/^[A-Za-z0-9_.-]+$/.test(normalized)) {
+    throw new Error('remote name may only contain letters, numbers, dots, dashes, and underscores');
+  }
+  return normalized;
+}
+
+function validateSingleLineValue(label, value) {
+  if (/[\0\r\n]/.test(value)) {
+    throw new Error(`${label} contains invalid control characters`);
+  }
+}
+
 function isSetupRequest(request) {
   return request.headers['x-docksync-setup'] === '1';
+}
+
+function runCommand(binary, args, input, { timeoutMs = 10000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(new Error(`${binary} timed out`));
+    }, timeoutMs);
+
+    function finish(error, value) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(value);
+    }
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', finish);
+    child.on('close', (code) => {
+      if (code === 0) {
+        finish(null, stdout.trim());
+        return;
+      }
+      finish(new Error(stderr.trim() || `${binary} exited with code ${code}`));
+    });
+    child.stdin.end(input || '');
+  });
+}
+
+async function obscureSecret(config, value) {
+  return runCommand(config.rclone.binary, ['obscure', '-'], `${value}\n`);
+}
+
+async function writeRcloneConfigFile(config, content) {
+  const targetPath = path.resolve(config.rclone.configPath);
+  const targetDirectory = path.dirname(targetPath);
+  await fs.promises.mkdir(targetDirectory, { recursive: true });
+  const tempPath = path.join(targetDirectory, `.rclone.conf.tmp-${process.pid}-${Date.now()}`);
+  try {
+    await fs.promises.writeFile(tempPath, content.trimEnd() + '\n', { mode: 0o600 });
+    await fs.promises.rename(tempPath, targetPath);
+    await fs.promises.chmod(targetPath, 0o600).catch(() => {});
+  } finally {
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {});
+  }
+}
+
+async function buildProtonDriveConfig(config, body) {
+  const remote = sanitizeRemoteSectionName(body.remoteName || remoteName(config.rclone.remote) || 'proton');
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+  const twoFactorCode = String(body.twoFactorCode || '').trim();
+  const mailboxPassword = String(body.mailboxPassword || '');
+
+  if (!username) {
+    throw new Error('Proton username is required');
+  }
+  if (!password) {
+    throw new Error('Proton password is required');
+  }
+  validateSingleLineValue('Proton username', username);
+  validateSingleLineValue('Proton password', password);
+  validateSingleLineValue('Mailbox password', mailboxPassword);
+  if (twoFactorCode && !/^[0-9]{6,8}$/.test(twoFactorCode)) {
+    throw new Error('2FA code must contain 6 to 8 digits');
+  }
+
+  const lines = [
+    `[${remote}]`,
+    'type = protondrive',
+    `username = ${username}`,
+    `password = ${await obscureSecret(config, password)}`,
+  ];
+  if (twoFactorCode) {
+    lines.push(`2fa = ${twoFactorCode}`);
+  }
+  if (mailboxPassword) {
+    lines.push(`mailbox_password = ${await obscureSecret(config, mailboxPassword)}`);
+  }
+  lines.push('app_version = external-drive-docksync@0.1.0');
+  return lines.join('\n');
 }
 
 function summarizeSyncResult(result) {
@@ -153,7 +262,7 @@ async function summarizeOnboarding(config, status) {
       detail: rcloneReady
         ? `Rclone can use ${localRemote ? config.rclone.remote : config.rclone.configPath}.`
         : rcloneConfigWritable
-          ? `Paste a Proton Rclone config into the assistant to create ${config.rclone.configPath}.`
+          ? `Use the assistant to generate or import a Proton Rclone config at ${config.rclone.configPath}.`
           : `Create a Proton Drive remote and mount rclone.conf at ${config.rclone.configPath}.`,
     },
     {
@@ -214,8 +323,8 @@ async function summarizeOnboarding(config, status) {
       },
       {
         id: 'proton-rclone',
-        label: 'Authenticate Proton Drive with Rclone',
-        command: 'rclone config\nrclone lsd proton:\ncp ~/.config/rclone/rclone.conf rclone/rclone.conf\nchmod 600 rclone/rclone.conf',
+        label: 'Manual Rclone fallback',
+        command: '# Only needed when the setup API cannot write /config/rclone.\nrclone config\nrclone lsd proton:\ncp ~/.config/rclone/rclone.conf rclone/rclone.conf\nchmod 600 rclone/rclone.conf',
       },
       {
         id: 'optional-secrets',
@@ -336,18 +445,38 @@ export function startServer(config, logger, engine, status) {
         const body = await readJsonBody(request);
         const expectedRemote = remoteName(config.rclone.remote);
         validateRcloneConfig(body.content, expectedRemote);
+        await writeRcloneConfigFile(config, body.content);
+        status.backendReady = false;
+        status.backendError = null;
+        sendJson(response, 200, {
+          ok: true,
+          onboarding: await summarizeOnboarding(config, status),
+        });
+      } catch (error) {
+        sendJson(response, 400, { ok: false, error: error.message });
+      }
+      return;
+    }
 
-        const targetPath = path.resolve(config.rclone.configPath);
-        const targetDirectory = path.dirname(targetPath);
-        await fs.promises.mkdir(targetDirectory, { recursive: true });
-        const tempPath = path.join(targetDirectory, `.rclone.conf.tmp-${process.pid}-${Date.now()}`);
-        try {
-          await fs.promises.writeFile(tempPath, body.content.trimEnd() + '\n', { mode: 0o600 });
-          await fs.promises.rename(tempPath, targetPath);
-          await fs.promises.chmod(targetPath, 0o600).catch(() => {});
-        } finally {
-          await fs.promises.rm(tempPath, { force: true }).catch(() => {});
-        }
+    if (request.method === 'POST' && request.url === '/setup/protondrive') {
+      if (!config.setup.enabled) {
+        sendJson(response, 403, { ok: false, error: 'setup API is disabled' });
+        return;
+      }
+      if (!isSetupRequest(request)) {
+        sendJson(response, 403, { ok: false, error: 'setup request header is required' });
+        return;
+      }
+      if (status.backendReady && !config.setup.allowOverwrite) {
+        sendJson(response, 409, { ok: false, error: 'backend is already configured; enable SETUP_ALLOW_OVERWRITE to replace rclone.conf' });
+        return;
+      }
+
+      try {
+        const body = await readJsonBody(request);
+        const content = await buildProtonDriveConfig(config, body);
+        validateRcloneConfig(content, remoteName(config.rclone.remote));
+        await writeRcloneConfigFile(config, content);
         status.backendReady = false;
         status.backendError = null;
         sendJson(response, 200, {

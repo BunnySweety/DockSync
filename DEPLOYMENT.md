@@ -8,7 +8,7 @@ Install these on the host:
 
 - Node.js 22 or newer for local checks.
 - Docker Engine or Docker Desktop.
-- Rclone for Proton Drive authentication setup.
+- Rclone only if you choose the manual host-side Proton setup fallback.
 
 Run the preflight:
 
@@ -19,9 +19,22 @@ npm run onboard
 
 `npm run onboard` creates ignored `data/`, `state/`, `rclone/`, and `secrets/` paths, including empty secret placeholders for the optional Compose override. It then verifies local prerequisites and package hygiene.
 
-## 2. Configure Proton Drive
+## 2. Prepare Runtime Paths
 
-Create the Proton Drive remote on the host:
+`npm run onboard` creates the writable host paths used by the container. Leave `rclone/rclone.conf` absent for first-run UI onboarding; the web assistant can create it after Compose starts.
+
+Optional secret placeholders are created under `secrets/`. Leave unused placeholders empty; Docker mounts them through the optional Compose secrets override.
+
+For webhook notifications, store the webhook URL outside Git:
+
+```bash
+printf '%s\n' 'https://example.invalid/webhook' > secrets/docksync_error_webhook
+chmod 600 secrets/docksync_error_webhook
+```
+
+## 3. Optional Manual Proton Drive Fallback
+
+The recommended deployment path configures Proton Drive from the web assistant. Use this fallback only if you already manage Rclone on the host:
 
 ```bash
 rclone config
@@ -42,16 +55,7 @@ printf '%s\n' 'your-rclone-config-passphrase' > secrets/rclone_config_pass
 chmod 600 secrets/rclone_config_pass
 ```
 
-For webhook notifications, store the webhook URL the same way:
-
-```bash
-printf '%s\n' 'https://example.invalid/webhook' > secrets/docksync_error_webhook
-chmod 600 secrets/docksync_error_webhook
-```
-
-`npm run onboard` creates empty placeholders for these files. Leave unused placeholders empty; Docker mounts them through the optional Compose secrets override.
-
-## 3. Validate Locally
+## 4. Validate Locally
 
 Run the full local gate before deploying:
 
@@ -63,7 +67,7 @@ npm run release:check
 
 For a no-Proton smoke test, use the local Rclone remote example in `README.md`.
 
-## 4. Build and Run
+## 5. Build and Run
 
 Build the image:
 
@@ -110,10 +114,10 @@ For direct `docker run` with an encrypted Rclone config, add:
 ```
 
 Open `http://127.0.0.1:8080/` for the web console.
-Use the first-connection installation assistant to confirm runtime mounts, Rclone config visibility, optional secrets, and the manual sync API from the running container.
+Use the first-connection installation assistant to enter Proton account details, import an existing `rclone.conf`, confirm runtime mounts, verify optional secrets, and check the manual sync API from the running container.
 The console remains available if `rclone/rclone.conf` is missing, but synchronization will report setup action items until the Proton remote is mounted.
 
-## 5. Operations
+## 6. Operations
 
 - Check health: `curl -fsS http://127.0.0.1:8080/healthz`.
 - View logs: `docker logs docksync`.
@@ -121,6 +125,6 @@ The console remains available if `rclone/rclone.conf` is missing, but synchroniz
 - Backup `state/` before upgrades if you need to preserve sync history.
 - Keep `data/`, `state/`, `rclone/`, and `secrets/` out of Git.
 
-## 6. Upgrade and Rollback
+## 7. Upgrade and Rollback
 
 Run `git pull`, `npm ci`, and `npm run release:check`, then rebuild the image. Keep the previous image tag until the new container has completed a successful sync. To roll back, stop the new container and run the previous image with the same `data/`, `state/`, and `rclone/` mounts.
